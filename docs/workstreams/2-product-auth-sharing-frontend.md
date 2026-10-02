@@ -243,3 +243,23 @@ Types come from `contracts.py` via `make types` (FastAPI OpenAPI → `frontend/l
 - Show "redacted" placeholders to providers; omit the data instead.
 - Give the provider role any access to Ask, records, notes, emails or unshared documents.
 - Hardcode any case-specific string, moment list or provider name.
+
+---
+
+## 9. Interfaces Dev 1 provides (merged from `ash` at the checkpoint; usable read-only)
+
+Your `ProviderProjection` should use these Dev 1 read helpers instead of re-deriving anything from raw tables:
+
+| Need | Call / table | Notes |
+|---|---|---|
+| Provider bills, balance, lien, visits, gaps | `backend.app.ai.views.provider_summaries(db, matter_id)` → `list[ProviderSummary]` | filter by `contact_id`; `visits` feed adherence |
+| Open requests for one provider (F7) | `backend.app.ai.views.open_requests(db, matter_id, provider_contact_id)` | already applies `request_states` (open only); `source_addressed_to_provider` tells you whether the excerpt may be shown to the provider |
+| Coverage (F4/F6) | `backend.app.ai.value.coverage(db, matter_id)` → `Coverage` | `.confirmed` for "Coverage confirmed"; carrier/limits are `Cited` or `NotFound` |
+| Case value (F5 toggle) | `backend.app.ai.value.worth(db, matter_id)` → `WorthEstimate \| NotFound` | share only `low`/`high` |
+| Stage bar | `backend.app.ai.views.stage_info(db, matter_row)` | |
+| Heartbeat "alive" | `SELECT MAX(occurred_at) FROM records WHERE matter_id=? AND deleted_at IS NULL AND type NOT IN ('contact','custom_field')` | Active ≤30d / Quiet ≤90d / Dormant / Closed if `matters.status='closed'` |
+| Last movement (provider-safe) | `digests.provider_safe_summary` where `confidential=0`, plus `records.type='matter_event'` (stage/status changes, always provider-safe) | never use `one_liner` (may be confidential) |
+| Facts | `facts.kind` ∈ injury, coverage, date_of_incident, statute_of_limitations, date_of_birth, treatment_visit, client_photo | `value`/`citations` are JSON |
+| Documents for the picker | `records WHERE type='document'`; file via `documents.processor.file_path_for(record_id)` | serve to providers only if the id is in the latest policy |
+
+Extra attorney endpoints that already exist: `GET /api/documents/{id}/pages/{n}/image` (page PNG for the Source Drawer), `GET /api/ai-costs/firm` (firm cost page). Dates are ISO strings with a `Z` suffix; URL-encode query params anyway.
