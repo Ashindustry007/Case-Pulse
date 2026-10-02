@@ -163,3 +163,71 @@ def test_malformed_fact_is_ignored_not_fatal(seeded):
                    "VALUES (?, 'coverage', '{\"carrier\": 1}', '[]', 'x', '2999-01-01T00:00:00Z')", (MATTER,))
         assert sources.coverage(db, MATTER) is None
     assert "coverage" not in _case(seeded, ["coverage"])
+
+
+# ------------------------------------------------------------------------------ grants / release / audit (2.6b)
+
+
+def test_release_versions_and_logs(api, seeded):
+    att = api("attorney")
+    gid, r1 = share(att, fields=["status"])
+    assert r1["policy"]["version"] == 1 and r1["invite_url"] is None        # provider A already has an account
+    _, r2 = share(att, fields=["status", "coverage"])                        # same grant reused
+    assert r2["policy"]["version"] == 2
+    audit = att.get(f"/api/shares/{gid}/audit").json()
+    assert [v["policy"]["version"] for v in audit["versions"]] == [1, 2]
+    assert audit["versions"][1]["added"] == ["coverage", "coverage:confirmed"] and audit["versions"][1]["removed"] == []
+    assert [e["event"] for e in audit["events"]] == ["released", "released"]
+    assert audit["grant"]["latest_version"] == 2 and audit["grant"]["provider_user_id"] is not None
+
+
+def test_release_to_new_email_creates_invite(api, seeded, capsys):
+    att = api("attorney")
+    gid, r = share(att, contact=PROV_B, email="new@clinic.test")
+    assert r["invite_url"] and "/invite/" in r["invite_url"]
+    assert r["invite_url"] in capsys.readouterr().out                       # console fallback
+    events = [e["event"] for e in att.get(f"/api/shares/{gid}/audit").json()["events"]]
+    assert events == ["released", "invite_sent"]
+
+
+def test_release_rejects_foreign_documents_and_revoked_grants(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att)
+    bad = att.post(f"/api/shares/{gid}/release", json={"fields": ["documents"], "document_ids": ["document:999"]})
+    assert bad.status_code == 400
+    assert att.post(f"/api/shares/{gid}/revoke").status_code == 200
+    again = att.post(f"/api/shares/{gid}/release", json={"fields": ["status"]})
+    assert again.status_code == 409
+    assert att.get(f"/api/shares/{gid}/audit").json()["events"][-1]["event"] == "revoked"
+
+
+def test_candidates_include_everything_scoped(api, seeded):
+    att = api("attorney")
+    c = att.get(f"/api/matters/{MATTER}/share-candidates?provider_contact_id={PROV_A}").json()
+    assert c["provider"]["name"] == "Provider A Clinic"
+    assert set(c["coverage_variants"]) == {"confirmed", "limits"}
+    assert {d["id"] for d in c["available_documents"]} == {"document:10", "document:11"}
+    assert c["case"]["bills"]["billed"] == 1200.0 and "heartbeat" in c["case"]
+
+
+def test_candidates_for_unknown_provider_404(api, seeded):
+    assert api("attorney").get(f"/api/matters/{MATTER}/share-candidates?provider_contact_id=999").status_code == 404
+
+
+def test_attorney_request_view_and_dismiss(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["open_requests"])
+    reqs = att.get(f"/api/matters/{MATTER}/requests?provider_contact_id={PROV_A}").json()
+    assert all(r["citations"] for r in reqs)                                  # attorney always sees sources
+    assert att.post("/api/requests/req:1/dismiss").status_code == 200
+    states = {r["id"]: r["state"] for r in att.get(f"/api/matters/{MATTER}/requests?provider_contact_id={PROV_A}").json()}
+    assert states["req:1"] == "dismissed"
+    assert att.get(f"/api/shares/{gid}/audit").json()["events"][-1]["event"] == "request_dismissed"
+    assert att.post("/api/requests/req:nope/dismiss").status_code == 404
+
+
+def test_list_grants(api, seeded):
+    att = api("attorney")
+    share(att)
+    grants = att.get(f"/api/matters/{MATTER}/shares").json()
+    assert len(grants) == 1 and grants[0]["provider_name"] == "Provider A Clinic"
