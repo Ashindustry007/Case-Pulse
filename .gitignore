@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Case Pulse ---
+# The Python template above ignores lib/ — re-include the frontend's lib/
+!frontend/lib/
+data/
+node_modules/
+.next/
+frontend/next-env.d.ts
+.DS_Store

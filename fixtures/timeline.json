@@ -1,0 +1,101 @@
+{
+  "items": [
+    {
+      "record_id": "note:1",
+      "type": "note",
+      "title": "Intake call",
+      "occurred_at": "2025-03-14",
+      "author": "Paralegal",
+      "one_liner": "Rear-end collision; ER visit same day",
+      "category": "liability",
+      "importance": 10,
+      "citations": [
+        {
+          "record_id": "note:1",
+          "source_type": "note",
+          "title": "Intake call",
+          "author": "Paralegal",
+          "date": "2025-03-14",
+          "page": null,
+          "char_start": 0,
+          "char_end": 71,
+          "excerpt": "Client was rear-ended at a red light on 03/14/2025 and taken to the ER.",
+          "clio_url": null
+        }
+      ]
+    },
+    {
+      "record_id": "document:10",
+      "type": "document",
+      "title": "MRI Report - Lumbar.pdf",
+      "occurred_at": "2025-04-02",
+      "author": null,
+      "one_liner": "MRI confirms L4-L5 herniation",
+      "category": "medical",
+      "importance": 9,
+      "citations": [
+        {
+          "record_id": "document:10",
+          "source_type": "document",
+          "title": "MRI Report - Lumbar.pdf",
+          "author": null,
+          "date": "2025-04-02",
+          "page": 3,
+          "char_start": 0,
+          "char_end": 81,
+          "excerpt": "Impression: L4-L5 posterior disc herniation with left neural foraminal narrowing.",
+          "clio_url": null
+        }
+      ]
+    },
+    {
+      "record_id": "document:11",
+      "type": "document",
+      "title": "Declarations Page.pdf",
+      "occurred_at": "2025-06-02",
+      "author": null,
+      "one_liner": "BI limits 100k/300k",
+      "category": "coverage",
+      "importance": 9,
+      "citations": [
+        {
+          "record_id": "document:11",
+          "source_type": "document",
+          "title": "Declarations Page.pdf",
+          "author": null,
+          "date": "2025-06-02",
+          "page": 1,
+          "char_start": 0,
+          "char_end": 71,
+          "excerpt": "Bodily Injury Liability: $100,000 each person / $300,000 each accident.",
+          "clio_url": null
+        }
+      ]
+    },
+    {
+      "record_id": "communication:20",
+      "type": "communication",
+      "title": "RE: Claim \u2014 IME request",
+      "occurred_at": "2026-09-29",
+      "author": "Adjuster",
+      "one_liner": "Adjuster requests IME",
+      "category": "negotiation",
+      "importance": 8,
+      "citations": [
+        {
+          "record_id": "communication:20",
+          "source_type": "communication",
+          "title": "RE: Claim 55-1234 \u2014 IME request",
+          "author": "Adjuster",
+          "date": "2026-09-29",
+          "page": null,
+          "char_start": 0,
+          "char_end": 82,
+          "excerpt": "We are requesting an independent medical examination before evaluating the demand.",
+          "clio_url": null
+        }
+      ]
+    }
+  ],
+  "total": 4
+}

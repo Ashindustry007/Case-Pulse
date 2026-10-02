@@ -1,0 +1,176 @@
+{
+  "matter": {
+    "id": 1001,
+    "display_number": "00042-Rivera",
+    "description": "Rivera v. Example Trucking",
+    "status": "open",
+    "stage": "Treatment",
+    "client_name": "Jordan Rivera",
+    "last_activity_at": "2026-09-29T16:02:00Z"
+  },
+  "client": {
+    "contact_id": 500,
+    "name": "Jordan Rivera",
+    "photo_url": "/api/documents/document:12/file",
+    "photo_citation": {
+      "record_id": "document:12",
+      "source_type": "document",
+      "title": "client_photo.jpg",
+      "author": null,
+      "date": null,
+      "page": null,
+      "char_start": 0,
+      "char_end": 29,
+      "excerpt": "Client photo (image document)",
+      "clio_url": null
+    },
+    "date_of_birth": {
+      "not_found": true,
+      "label": "Date of birth"
+    },
+    "age": null,
+    "phone": "(555) 010-0000",
+    "email": "client@example.com"
+  },
+  "stage": {
+    "current": "Treatment",
+    "stages": [
+      "Intake",
+      "Treatment",
+      "Demand",
+      "Negotiation",
+      "Litigation",
+      "Settlement"
+    ],
+    "index": 1
+  },
+  "date_of_incident": {
+    "value": "2025-03-14",
+    "citations": [
+      {
+        "record_id": "note:1",
+        "source_type": "note",
+        "title": "Intake call",
+        "author": "Paralegal",
+        "date": "2025-03-14",
+        "page": null,
+        "char_start": 0,
+        "char_end": 71,
+        "excerpt": "Client was rear-ended at a red light on 03/14/2025 and taken to the ER.",
+        "clio_url": null
+      }
+    ]
+  },
+  "statute_of_limitations": {
+    "value": "2027-03-14",
+    "citations": [
+      {
+        "record_id": "custom_field:60",
+        "source_type": "custom_field",
+        "title": "Custom field \u00b7 Statute of Limitations",
+        "author": null,
+        "date": null,
+        "page": null,
+        "char_start": 0,
+        "char_end": 34,
+        "excerpt": "Statute of Limitations: 2027-03-14",
+        "clio_url": null
+      }
+    ]
+  },
+  "firm_spend": {
+    "value": 6430.0,
+    "citations": [
+      {
+        "record_id": "expense:50",
+        "source_type": "expense",
+        "title": "Expense \u00b7 Medical records fee",
+        "author": "Paralegal",
+        "date": "2025-07-01",
+        "page": null,
+        "char_start": 0,
+        "char_end": 38,
+        "excerpt": "Expense \u00b7 Medical records fee \u00b7 $85.00",
+        "clio_url": null
+      }
+    ]
+  },
+  "medical_specials": {
+    "value": 31540.0,
+    "citations": [
+      {
+        "record_id": "medical_bill:30",
+        "source_type": "medical_bill",
+        "title": "Medical bill \u00b7 Northside Orthopedics",
+        "author": null,
+        "date": "2025-05-02",
+        "page": null,
+        "char_start": 0,
+        "char_end": 62,
+        "excerpt": "Medical bill \u00b7 Northside Orthopedics \u00b7 $22,140.00 \u00b7 2025-05-02",
+        "clio_url": null
+      },
+      {
+        "record_id": "medical_bill:31",
+        "source_type": "medical_bill",
+        "title": "Medical bill \u00b7 Harbor Physical Therapy",
+        "author": null,
+        "date": "2025-08-30",
+        "page": null,
+        "char_start": 0,
+        "char_end": 63,
+        "excerpt": "Medical bill \u00b7 Harbor Physical Therapy \u00b7 $9,400.00 \u00b7 2025-08-30",
+        "clio_url": null
+      }
+    ]
+  },
+  "next_deadline": {
+    "id": "calendar_entry:70",
+    "title": "IME appointment",
+    "kind": "calendar",
+    "due_at": "2026-10-15T09:00:00",
+    "status": null,
+    "assignee": null,
+    "waiting_on": null,
+    "overdue": false,
+    "citations": [
+      {
+        "record_id": "communication:20",
+        "source_type": "communication",
+        "title": "RE: Claim 55-1234 \u2014 IME request",
+        "author": "Adjuster",
+        "date": "2026-09-29",
+        "page": null,
+        "char_start": 0,
+        "char_end": 82,
+        "excerpt": "We are requesting an independent medical examination before evaluating the demand.",
+        "clio_url": null
+      }
+    ]
+  },
+  "last_client_contact": {
+    "value": {
+      "at": "2026-09-09T15:30:00Z",
+      "days_ago": 23,
+      "channel": "call",
+      "by": "Paralegal",
+      "summary": "Status check on treatment"
+    },
+    "citations": [
+      {
+        "record_id": "note:2",
+        "source_type": "note",
+        "title": "Call with client",
+        "author": "Paralegal",
+        "date": "2026-09-09",
+        "page": null,
+        "char_start": 0,
+        "char_end": 55,
+        "excerpt": "Spoke with client; still in PT twice weekly, pain 6/10.",
+        "clio_url": null
+      }
+    ]
+  },
+  "last_synced_at": "2026-10-02T17:41:00Z",
+  "last_digested_at": "2026-10-02T17:42:00Z"
+}

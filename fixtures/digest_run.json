@@ -1,0 +1,21 @@
+{
+  "id": 1,
+  "matter_id": 1001,
+  "trigger": "manual",
+  "started_at": "2026-10-02T17:40:00Z",
+  "finished_at": "2026-10-02T17:42:00Z",
+  "records_seen": 312,
+  "records_changed": 0,
+  "llm_calls": 0,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "cost_usd": 0.0,
+  "cache_hit": true,
+  "stages": {
+    "digest": {
+      "items": 312,
+      "llm_calls": 0,
+      "skipped": 312
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "grant_id": 1,
+  "policy_version": 2,
+  "patient_display": "J. R.",
+  "firm_name": "Your Firm",
+  "shared_by": "Firm Attorney",
+  "updated_at": "2026-10-01T16:02:00Z",
+  "heartbeat": {
+    "state": "active",
+    "last_activity_at": "2026-09-29",
+    "last_movement": {
+      "date": "2026-09-29",
+      "text": "Case moved to Demand stage"
+    },
+    "stage": {
+      "current": "Demand",
+      "stages": [
+        "Intake",
+        "Treatment",
+        "Demand",
+        "Negotiation",
+        "Litigation",
+        "Settlement"
+      ],
+      "index": 2
+    },
+    "recent_movement": [
+      {
+        "date": "2026-09-29",
+        "text": "Case moved to Demand stage"
+      },
+      {
+        "date": "2026-09-12",
+        "text": "ER records received"
+      }
+    ]
+  },
+  "status_note": "Treatment is ongoing; we need your records for 06/01\u201309/01.",
+  "coverage": {
+    "confirmed": true,
+    "carrier": null,
+    "limits_text": null
+  },
+  "case_value": null,
+  "bills": {
+    "billed": 22140.0,
+    "balance": 18000.0,
+    "lien": true,
+    "items": [
+      {
+        "date": "2025-05-02",
+        "amount": 22140.0,
+        "description": "Orthopedic care"
+      }
+    ]
+  },
+  "requests": [
+    {
+      "id": "req:1",
+      "kind": "records",
+      "description": "Records for visits 06/01\u201309/01",
+      "requested_at": "2026-09-20",
+      "channel": "task",
+      "state": "open",
+      "provider_contact_id": 600,
+      "citations": [
+        {
+          "record_id": "task:40",
+          "source_type": "task",
+          "title": "Request PT records 06/01\u201309/01",
+          "author": "Paralegal",
+          "date": "2026-09-20",
+          "page": null,
+          "char_start": 0,
+          "char_end": 82,
+          "excerpt": "Task: Request PT records 06/01\u201309/01 from Harbor Physical Therapy \u00b7 due 2026-09-20",
+          "clio_url": null
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "id": "document:10",
+      "title": "MRI Report - Lumbar.pdf",
+      "shared_at": "2026-10-01",
+      "page_count": 5
+    }
+  ],
+  "adherence": null,
+  "other_care": null
+}

@@ -1,0 +1,50 @@
+{
+  "total": {
+    "value": 6430.0,
+    "citations": [
+      {
+        "record_id": "expense:50",
+        "source_type": "expense",
+        "title": "Expense \u00b7 Medical records fee",
+        "author": "Paralegal",
+        "date": "2025-07-01",
+        "page": null,
+        "char_start": 0,
+        "char_end": 38,
+        "excerpt": "Expense \u00b7 Medical records fee \u00b7 $85.00",
+        "clio_url": null
+      }
+    ]
+  },
+  "by_category": [
+    {
+      "category": "Medical records",
+      "amount": 85.0,
+      "count": 1,
+      "citations": [
+        {
+          "record_id": "expense:50",
+          "source_type": "expense",
+          "title": "Expense \u00b7 Medical records fee",
+          "author": "Paralegal",
+          "date": "2025-07-01",
+          "page": null,
+          "char_start": 0,
+          "char_end": 38,
+          "excerpt": "Expense \u00b7 Medical records fee \u00b7 $85.00",
+          "clio_url": null
+        }
+      ]
+    }
+  ],
+  "monthly": [
+    {
+      "month": "2025-07",
+      "amount": 85.0
+    },
+    {
+      "month": "2026-09",
+      "amount": 6345.0
+    }
+  ]
+}

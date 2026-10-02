@@ -1,0 +1,17 @@
+{
+  "matters": [
+    {
+      "matter_id": 1001,
+      "display_number": "00042-Rivera",
+      "description": "Rivera v. Example Trucking",
+      "total_usd": 2.31
+    }
+  ],
+  "series": [
+    {
+      "date": "2026-10-02",
+      "usd": 2.31
+    }
+  ],
+  "total_usd": 2.31
+}

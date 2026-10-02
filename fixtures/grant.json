@@ -1,0 +1,13 @@
+{
+  "id": 1,
+  "matter_id": 1001,
+  "provider_contact_id": 600,
+  "provider_name": "Northside Orthopedics",
+  "email": "records@northside.example",
+  "provider_user_id": 2,
+  "latest_version": 2,
+  "released_at": "2026-10-01T16:02:00Z",
+  "revoked_at": null,
+  "last_viewed_at": "2026-10-01T16:14:00Z",
+  "view_count": 2
+}

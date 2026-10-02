@@ -1,0 +1,125 @@
+{
+  "providers": [
+    {
+      "contact_id": 600,
+      "name": "Northside Orthopedics",
+      "email": "records@northside.example",
+      "phone": null,
+      "relationship": "Treating Physician",
+      "billed": {
+        "value": 22140.0,
+        "citations": [
+          {
+            "record_id": "medical_bill:30",
+            "source_type": "medical_bill",
+            "title": "Medical bill \u00b7 Northside Orthopedics",
+            "author": null,
+            "date": "2025-05-02",
+            "page": null,
+            "char_start": 0,
+            "char_end": 62,
+            "excerpt": "Medical bill \u00b7 Northside Orthopedics \u00b7 $22,140.00 \u00b7 2025-05-02",
+            "clio_url": null
+          }
+        ]
+      },
+      "balance": {
+        "value": 18000.0,
+        "citations": [
+          {
+            "record_id": "medical_bill:30",
+            "source_type": "medical_bill",
+            "title": "Medical bill \u00b7 Northside Orthopedics",
+            "author": null,
+            "date": "2025-05-02",
+            "page": null,
+            "char_start": 0,
+            "char_end": 62,
+            "excerpt": "Medical bill \u00b7 Northside Orthopedics \u00b7 $22,140.00 \u00b7 2025-05-02",
+            "clio_url": null
+          }
+        ]
+      },
+      "lien": true,
+      "visits": [
+        {
+          "date": "2025-05-02",
+          "description": null,
+          "citations": [
+            {
+              "record_id": "medical_bill:30",
+              "source_type": "medical_bill",
+              "title": "Medical bill \u00b7 Northside Orthopedics",
+              "author": null,
+              "date": "2025-05-02",
+              "page": null,
+              "char_start": 0,
+              "char_end": 62,
+              "excerpt": "Medical bill \u00b7 Northside Orthopedics \u00b7 $22,140.00 \u00b7 2025-05-02",
+              "clio_url": null
+            }
+          ]
+        }
+      ],
+      "first_visit": "2025-05-02",
+      "last_visit": "2026-09-12",
+      "current_gap_days": 20,
+      "longest_gap_days": 41,
+      "open_requests": 1
+    },
+    {
+      "contact_id": 601,
+      "name": "Harbor Physical Therapy",
+      "email": null,
+      "phone": null,
+      "relationship": "Physical Therapist",
+      "billed": {
+        "value": 9400.0,
+        "citations": [
+          {
+            "record_id": "medical_bill:31",
+            "source_type": "medical_bill",
+            "title": "Medical bill \u00b7 Harbor Physical Therapy",
+            "author": null,
+            "date": "2025-08-30",
+            "page": null,
+            "char_start": 0,
+            "char_end": 63,
+            "excerpt": "Medical bill \u00b7 Harbor Physical Therapy \u00b7 $9,400.00 \u00b7 2025-08-30",
+            "clio_url": null
+          }
+        ]
+      },
+      "balance": {
+        "not_found": true,
+        "label": "Balance"
+      },
+      "lien": true,
+      "visits": [
+        {
+          "date": "2025-08-30",
+          "description": null,
+          "citations": [
+            {
+              "record_id": "medical_bill:31",
+              "source_type": "medical_bill",
+              "title": "Medical bill \u00b7 Harbor Physical Therapy",
+              "author": null,
+              "date": "2025-08-30",
+              "page": null,
+              "char_start": 0,
+              "char_end": 63,
+              "excerpt": "Medical bill \u00b7 Harbor Physical Therapy \u00b7 $9,400.00 \u00b7 2025-08-30",
+              "clio_url": null
+            }
+          ]
+        }
+      ],
+      "first_visit": "2025-04-10",
+      "last_visit": "2025-08-30",
+      "current_gap_days": null,
+      "longest_gap_days": null,
+      "open_requests": 1
+    }
+  ]
+}

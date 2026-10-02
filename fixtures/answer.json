@@ -1,0 +1,31 @@
+{
+  "segments": [
+    {
+      "id": "s1",
+      "text": "The MRI confirms an L4-L5 posterior disc herniation",
+      "citations": [
+        {
+          "record_id": "document:10",
+          "source_type": "document",
+          "title": "MRI Report - Lumbar.pdf",
+          "author": null,
+          "date": "2025-04-02",
+          "page": 3,
+          "char_start": 0,
+          "char_end": 81,
+          "excerpt": "Impression: L4-L5 posterior disc herniation with left neural foraminal narrowing.",
+          "clio_url": null
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "text": ", which is the primary injury in the file.",
+      "citations": []
+    }
+  ],
+  "followups": [
+    "What treatment has the client received for the herniation?"
+  ],
+  "cost_usd": 0.08
+}

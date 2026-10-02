@@ -1,0 +1,14 @@
+{
+  "matter_id": 1001,
+  "started_at": "2026-10-02T17:40:00Z",
+  "finished_at": "2026-10-02T17:41:00Z",
+  "counts": {
+    "notes": 120,
+    "communications": 90,
+    "tasks": 40,
+    "documents": 35
+  },
+  "new": 0,
+  "changed": 0,
+  "removed": 0
+}
