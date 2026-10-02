@@ -6,6 +6,7 @@ Agreed shapes: docs/workstreams/interface-dev1-dev2.md. Every reader returns Non
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 from pydantic import TypeAdapter, ValidationError
@@ -47,16 +48,26 @@ def stage(db: sqlite3.Connection, matter_id: int) -> StageShare | None:
 def last_activity_at(db: sqlite3.Connection, matter_id: int, until: str) -> str | None:
     """Most recent past record date (future due dates don't count as activity)."""
     return db.execute("SELECT MAX(occurred_at) AS at FROM records WHERE matter_id = ? AND deleted_at IS NULL "
-                      "AND occurred_at IS NOT NULL AND occurred_at <= ?", (matter_id, until)).fetchone()["at"]
+                      "AND occurred_at IS NOT NULL AND date(occurred_at) IS NOT NULL AND occurred_at <= ?",
+                      (matter_id, until)).fetchone()["at"]
 
 
 def movements(db: sqlite3.Connection, matter_id: int, until: str, limit: int = 5) -> list[Movement]:
     rows = db.execute(
         "SELECT r.occurred_at, d.provider_safe_summary AS text FROM records r JOIN digests d ON d.record_id = r.id "
-        "WHERE r.matter_id = ? AND r.deleted_at IS NULL AND r.occurred_at IS NOT NULL AND r.occurred_at <= ? "
+        "WHERE r.matter_id = ? AND r.deleted_at IS NULL AND r.occurred_at IS NOT NULL AND date(r.occurred_at) IS NOT NULL "
+        "AND r.occurred_at <= ? "
         "AND d.confidential = 0 AND COALESCE(d.provider_safe_summary, '') != '' "
         "ORDER BY r.occurred_at DESC LIMIT ?", (matter_id, until, limit))
     return [Movement(date=r["occurred_at"][:10], text=r["text"]) for r in rows]
+
+
+def _meta(raw) -> dict:
+    try:
+        meta = jload(raw, {})
+    except ValueError:
+        return {}
+    return meta if isinstance(meta, dict) else {}
 
 
 def provider_identity(db: sqlite3.Connection, contact_id: int) -> ProviderIdentity | None:
@@ -65,19 +76,27 @@ def provider_identity(db: sqlite3.Connection, contact_id: int) -> ProviderIdenti
 
 
 def provider_bills(db: sqlite3.Connection, matter_id: int, contact_id: int) -> ProviderBills | None:
-    rows = db.execute("SELECT title, occurred_at, meta FROM records WHERE matter_id = ? AND type = 'medical_bill' "
-                      "AND deleted_at IS NULL AND json_extract(meta, '$.provider_contact_id') = ? ORDER BY occurred_at",
-                      (matter_id, contact_id)).fetchall()
+    try:
+        rows = db.execute("SELECT title, occurred_at, meta FROM records WHERE matter_id = ? AND type = 'medical_bill' "
+                          "AND deleted_at IS NULL AND json_extract(meta, '$.provider_contact_id') = ? "
+                          "ORDER BY occurred_at", (matter_id, contact_id)).fetchall()
+    except sqlite3.OperationalError as e:  # malformed JSON in meta
+        print(f"[sharing] ignoring malformed medical_bill meta for matter {matter_id}: {e}")
+        return None
     if not rows:
         return None
-    metas = [jload(r["meta"], {}) for r in rows]
-    balances = [float(m["balance"]) for m in metas if m.get("balance") is not None]
-    return ProviderBills(
-        billed=sum(float(m.get("amount") or 0) for m in metas),
-        balance=sum(balances) if balances else None,
-        lien=any(bool(m.get("lien")) for m in metas),
-        items=[BillLine(date=(r["occurred_at"] or "")[:10] or None, amount=float(m.get("amount") or 0),
-                        description=m.get("description") or r["title"]) for r, m in zip(rows, metas)])
+    metas = [_meta(r["meta"]) for r in rows]
+    try:
+        balances = [float(m["balance"]) for m in metas if m.get("balance") is not None]
+        return ProviderBills(
+            billed=sum(float(m.get("amount") or 0) for m in metas),
+            balance=sum(balances) if balances else None,
+            lien=any(bool(m.get("lien")) for m in metas),
+            items=[BillLine(date=(r["occurred_at"] or "")[:10] or None, amount=float(m.get("amount") or 0),
+                            description=m.get("description") or r["title"]) for r, m in zip(rows, metas)])
+    except (TypeError, ValueError, ValidationError) as e:
+        print(f"[sharing] ignoring malformed medical_bill for matter {matter_id}: {e}")
+        return None
 
 
 def documents(db: sqlite3.Connection, matter_id: int) -> list[SharedDocument]:
@@ -90,7 +109,7 @@ def documents(db: sqlite3.Connection, matter_id: int) -> list[SharedDocument]:
 def document_path(db: sqlite3.Connection, matter_id: int, document_id: str) -> Path | None:
     row = db.execute("SELECT meta FROM records WHERE id = ? AND matter_id = ? AND type = 'document' "
                      "AND deleted_at IS NULL", (document_id, matter_id)).fetchone()
-    rel = jload(row["meta"], {}).get("file_path") if row else None
+    rel = _meta(row["meta"]).get("file_path") if row else None
     if not rel:
         return None
     root = data_dir().resolve()
@@ -141,4 +160,15 @@ def worth(db: sqlite3.Connection, matter_id: int) -> WorthEstimate | None:
 
 def treatment_visits(db: sqlite3.Connection, matter_id: int) -> list[dict]:
     rows = db.execute("SELECT value FROM facts WHERE matter_id = ? AND kind = 'treatment_visit'", (matter_id,))
-    return [v for v in (jload(r["value"], {}) for r in rows) if isinstance(v, dict) and v.get("date")]
+    return [v for v in (jload(r["value"], {}) for r in rows) if isinstance(v, dict) and _valid_date(v.get("date"))]
+
+
+def _valid_date(value) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        date.fromisoformat(value[:10])
+    except ValueError:
+        print(f"[sharing] ignoring treatment_visit with malformed date {value!r}")
+        return False
+    return True

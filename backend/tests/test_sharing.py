@@ -231,3 +231,37 @@ def test_list_grants(api, seeded):
     share(att)
     grants = att.get(f"/api/matters/{MATTER}/shares").json()
     assert len(grants) == 1 and grants[0]["provider_name"] == "Provider A Clinic"
+
+
+def test_malformed_visit_date_omits_only_adherence(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, created_at) VALUES "
+                   "(?, 'treatment_visit', ?, '[]', 'x', '2026-01-01T00:00:00Z')",
+                   (MATTER, '{"provider_contact_id": %d, "provider_name": "Provider A Clinic", '
+                            '"date": "not-a-date"}' % PROV_A))
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, created_at) VALUES "
+                   "(?, 'treatment_visit', ?, '[]', 'y', '2026-01-01T00:00:00Z')",
+                   (MATTER, '{"provider_contact_id": %d, "date": 12345}' % PROV_A))
+    case = _case(seeded, ["status", "adherence", "bills"])
+    assert "heartbeat" in case and "bills" in case
+    assert len(case["adherence"]["visits"]) == 2
+
+
+def test_malformed_bill_amount_omits_only_bills(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO records(id, matter_id, type, title, body_text, occurred_at, meta, content_hash, "
+                   "first_seen_at, last_changed_at) VALUES ('medical_bill:99', ?, 'medical_bill', 'Bad', 'Bad', ?, ?, "
+                   "'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                   (MATTER, days_ago(1), '{"provider_contact_id": %d, "amount": "abc"}' % PROV_A))
+    case = _case(seeded, ["status", "bills"])
+    assert "bills" not in case and "heartbeat" in case
+
+
+def test_malformed_occurred_at_is_ignored(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO records(id, matter_id, type, title, body_text, occurred_at, meta, content_hash, "
+                   "first_seen_at, last_changed_at) VALUES ('note:98', ?, 'note', 'Odd', 'Odd', 'garbage', '{}', "
+                   "'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')", (MATTER,))
+    hb = _case(seeded, ["status"])["heartbeat"]
+    assert hb["state"] == "active"
+    assert hb["last_movement"] == {"date": days_ago(3), "text": "Case activity recorded"}
