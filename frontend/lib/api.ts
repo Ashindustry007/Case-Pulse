@@ -9,6 +9,18 @@ export class ApiError extends Error {
 /** API-relative paths ("/api/...") → absolute URL; absolute URLs pass through. */
 export const apiUrl = (path: string) => (path.startsWith("/") ? `${API_URL}${path}` : path);
 
+let signingOut = false;
+
+/** Clear the (possibly unverifiable) session cookie, then go to login; a failed logout still redirects. */
+async function logoutThenLogin(next: string): Promise<void> {
+  if (signingOut) return;
+  signingOut = true;
+  try {
+    await fetch(apiUrl("/api/auth/logout"), { method: "POST", credentials: "include" });
+  } catch { /* redirect anyway */ }
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+}
+
 export async function api<T>(
   path: string,
   opts: { method?: string; json?: unknown; signal?: AbortSignal } = {},
@@ -22,7 +34,7 @@ export async function api<T>(
     signal: opts.signal,
   });
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/")) {
-    window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    void logoutThenLogin(window.location.pathname);
   }
   if (!res.ok) {
     let msg: unknown = res.statusText;
