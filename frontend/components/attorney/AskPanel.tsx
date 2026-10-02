@@ -15,6 +15,9 @@ import { useApi } from "@/lib/use-api";
 type Turn = { question: string; segments: AnswerSegment[]; followups: string[]; status?: string; error?: string; done: boolean };
 type Pop = { x: number; y: number; text: string; citations: Citation[]; needsVerify: boolean; verify?: LocateResult | "loading" };
 
+// Segment ids restart per answer, so scope them to their turn.
+const segKey = (turn: number, id: string): string => `${turn}:${id}`;
+
 export function AskPanel({ matterId }: { matterId: number }) {
   const suggested = useApi<SuggestedQuestions>(`/api/matters/${matterId}/suggested-questions`);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -51,7 +54,7 @@ export function AskPanel({ matterId }: { matterId: number }) {
     const range = sel.getRangeAt(0);
     const ids = segmentIdsInRange(answersRef.current, range);
     if (!ids.length) { setPop(null); return; }
-    const all = turns.flatMap((t) => t.segments);
+    const all = turns.flatMap((t, i) => t.segments.map((s) => ({ ...s, id: segKey(i, s.id) })));
     const { citations, needsVerify } = selectionSources(all, ids);
     const rect = range.getBoundingClientRect();
     setPop({ x: rect.left, y: rect.bottom + 6, text: sel.toString().trim(), citations, needsVerify });
@@ -82,7 +85,7 @@ export function AskPanel({ matterId }: { matterId: number }) {
             <p className="font-medium">Q: {t.question}</p>
             <p className="leading-relaxed">
               {t.segments.map((s) => (
-                <span key={s.id} data-seg={s.id}>
+                <span key={s.id} data-seg={segKey(i, s.id)}>
                   {s.text}
                   {s.citations?.map((c, j) => <sup key={j}><CitationChip citation={c} siblings={s.citations} /></sup>)}
                 </span>
