@@ -28,6 +28,15 @@ class Rendered:
     meta: dict = field(default_factory=dict)
 
 
+def file_ext(name: str | None, content_type: str | None) -> str:
+    """Stable file extension for a downloaded document (title first, then content type)."""
+    m = re.search(r"\.([A-Za-z0-9]{1,5})$", name or "")
+    if m:
+        return m.group(1).lower()
+    return {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "text/plain": "txt",
+            "text/html": "html"}.get((content_type or "").split(";")[0].strip().lower(), "bin")
+
+
 def strip_html(text: str | None) -> str:
     if not text:
         return ""
@@ -149,7 +158,8 @@ def document(d: dict) -> Rendered:
     body = "\n".join([f"Document: {name}", *head]).strip()
     return Rendered(title=name, body_text=body, occurred_at=d.get("received_at") or d.get("created_at"),
                     author=name_of(d.get("creator")),
-                    meta={"content_type": d.get("content_type") or ver.get("content_type"),
+                    meta={"file_path": f"files/{d.get('id')}.{file_ext(name, d.get('content_type') or ver.get('content_type'))}",
+                          "content_type": d.get("content_type") or ver.get("content_type"),
                           "size": d.get("size") or ver.get("size"), "version_id": ver.get("id"),
                           "category": name_of(d.get("document_category")), "folder": name_of(d.get("parent"))})
 

@@ -78,8 +78,9 @@ def process_document(db: sqlite3.Connection, client: Any, rec: sqlite3.Row, *, f
             return {"skipped": 1}
     data, ctype = client.download(int(rec["clio_id"]))
     ctype = (ctype or meta.get("content_type") or "").split(";")[0].strip().lower()
-    ext = _ext(rec["title"], ctype)
-    fname = f"{key}.{ext}"
+    rel = meta.get("file_path")  # files/{id}.{ext} — the path Dev 2's adapter serves (relative to DATA_DIR)
+    fname = rel.split("/", 1)[1] if rel and rel.startswith("files/") else f"{key}.{_ext(rec['title'], ctype)}"
+    ext = fname.rsplit(".", 1)[-1]
     (files_dir() / fname).write_bytes(data)
 
     db.execute("DELETE FROM document_pages WHERE document_id=?", (rec["id"],))

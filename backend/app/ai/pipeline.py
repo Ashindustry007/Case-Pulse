@@ -39,6 +39,7 @@ def run_pipeline(matter_id: int, *, trigger: str = "manual", clio: Any = None,
     from .digest import digest_matter
     from .extract import extract_all
     from .ocr import ocr_pending_pages
+    from .value import publish
 
     say = progress or (lambda m: log.info(m))
     with _lock, connect() as db:
@@ -74,6 +75,7 @@ def run_pipeline(matter_id: int, *, trigger: str = "manual", clio: Any = None,
         stage("index", lambda: build_index(db, matter_id))
         dig = stage("digest", lambda: digest_matter(db, matter_id))
         stage("extract", lambda: extract_all(db, matter_id))
+        stage("publish", lambda: publish(db, matter_id))
         stage("brief", lambda: ensure_brief(db, matter_id))
 
         total = _usage_since(db, start_id, matter_id)

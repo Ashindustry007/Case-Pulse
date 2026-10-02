@@ -82,8 +82,9 @@ class MatterSync:
                clio_updated_at: str | None = None) -> None:
         rid = rid or f"{rtype}:{clio_id}"
         self.seen.setdefault(rtype, set()).add(rid)
-        h = _hash(r.title, r.body_text, r.meta, r.occurred_at)
-        row = self.db.execute("SELECT content_hash, deleted_at FROM records WHERE id=?", (rid,)).fetchone()
+        # Storage bookkeeping (file_path) is not content: it must not mark a record as changed (F1) or re-digest it.
+        h = _hash(r.title, r.body_text, {k: v for k, v in r.meta.items() if k != "file_path"}, r.occurred_at)
+        row = self.db.execute("SELECT content_hash, deleted_at, meta FROM records WHERE id=?", (rid,)).fetchone()
         if row is None:
             self.db.execute(
                 """INSERT INTO records(id, matter_id, type, clio_id, title, body_text, occurred_at, author, participants,
@@ -100,6 +101,8 @@ class MatterSync:
                 (r.title, r.body_text, r.occurred_at, r.author, jdump(r.participants), jdump(r.meta), jdump(raw), h,
                  clio_updated_at, self.now, rid))
             self.changed += 1
+        elif row["meta"] != jdump(r.meta):  # bookkeeping-only update: no change event
+            self.db.execute("UPDATE records SET meta=? WHERE id=?", (jdump(r.meta), rid))
 
     def mark_deleted(self, rtype: str) -> None:
         if not self.full or rtype in self.errors:

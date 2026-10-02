@@ -5,10 +5,11 @@ client photo. Claude returns structured output with evidence quotes; every quote
 Results are cached by an input hash over the candidate sources; written to `facts` (one row per fact, read by the
 brief and by Dev 2's provider projection) and to `briefs(kind='extraction')`.
 
-facts.kind values (contract for readers): injury | coverage | date_of_incident | statute_of_limitations |
+facts.kind values (contract for readers): injury | coverage_field | date_of_incident | statute_of_limitations |
 date_of_birth | treatment_visit | client_photo | provider_bill
   provider_bill.value = {"provider_contact_id","provider_name","amount","balance","paid","lien","bill_date"}
-  coverage.value = {"field": carrier|bi_per_person|bi_per_accident|um_uim|medpay, "value": "<text>"}
+  coverage_field.value = {"field": carrier|bi_per_person|bi_per_accident|um_uim|medpay, "value": "<text>"}
+  coverage.value = contracts.Coverage JSON; worth.value = WorthEstimate | NotFound JSON  (written by value.publish)
   injury.value   = {"name","body_region","severity_tier","primary","description"}
   treatment_visit.value = {"provider_contact_id","provider_name","date","description","missed": bool}
 """
@@ -267,6 +268,7 @@ def extract_coverage(db: sqlite3.Connection, matter_id: int, ctx: str) -> dict:
     h = hashlib.sha256(f"{EXTRACT_VERSION}|coverage|{src.hash()}".encode()).hexdigest()
     if (cached := _cached(db, matter_id, "extract_coverage", h)) is not None:
         log_cache_hit("extract", settings.model_main, matter_id=matter_id)
+        _write_coverage_facts(db, matter_id, cached, h)  # cheap: keeps fact rows in the current shape
         return cached
     result: dict = {}
     if src.items:
@@ -286,13 +288,18 @@ def extract_coverage(db: sqlite3.Connection, matter_id: int, ctx: str) -> dict:
                 if cits:
                     result[field] = {"value": val.value, "citations": cits}
     _store(db, matter_id, "extract_coverage", h, result)
-    rows = [("coverage", {"field": f, "value": result[f]["value"]}, result[f]["citations"])
+    _write_coverage_facts(db, matter_id, result, h)
+    return result
+
+
+def _write_coverage_facts(db: sqlite3.Connection, matter_id: int, result: dict, h: str) -> None:
+    rows = [("coverage_field", {"field": f, "value": result[f]["value"]}, result[f]["citations"])
             for f in ("carrier", "bi_per_person", "bi_per_accident", "um_uim", "medpay") if f in result]
     rows += [(f, {"value": result[f]["value"]}, result[f]["citations"])
              for f in ("date_of_incident", "statute_of_limitations", "date_of_birth") if f in result]
-    _replace_facts(db, matter_id, ("coverage", "date_of_incident", "statute_of_limitations", "date_of_birth"), rows, h)
+    _replace_facts(db, matter_id, ("coverage_field", "date_of_incident", "statute_of_limitations", "date_of_birth"),
+                   rows, h)
     db.commit()
-    return result
 
 
 def extract_requests(db: sqlite3.Connection, matter_id: int, ctx: str) -> list[dict]:

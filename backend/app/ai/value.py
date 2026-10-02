@@ -89,7 +89,8 @@ def _facts(db: sqlite3.Connection, matter_id: int, kind: str) -> list[tuple[dict
 
 
 def coverage(db: sqlite3.Connection, matter_id: int) -> Coverage:
-    found = {v["field"]: Cited[str](value=v["value"], citations=c) for v, c in _facts(db, matter_id, "coverage") if c}
+    found = {v["field"]: Cited[str](value=v["value"], citations=c) for v, c in _facts(db, matter_id, "coverage_field")
+             if c}
     labels = {"carrier": "Liability carrier", "bi_per_person": "BI limit per person",
               "bi_per_accident": "BI limit per accident", "um_uim": "UM/UIM limits", "medpay": "MedPay / PIP"}
     vals = {f: found.get(f) or NotFound(label=labels[f]) for f in labels}
@@ -135,3 +136,23 @@ def worth(db: sqlite3.Connection, matter_id: int) -> WorthEstimate | NotFound:
         assumptions.append(Assumption(label="Policy limits", not_found=True, text="Not found in file"))
     return WorthEstimate(low=low, high=high, assumptions=assumptions, cap_note=cap_note,
                          method=" ".join(MODEL["method"].split()))
+
+
+def publish(db: sqlite3.Connection, matter_id: int) -> dict:
+    """Write the aggregate `coverage` and `worth` facts in the shape Dev 2's sharing adapter reads
+    (docs/workstreams/interface-dev1-dev2.md). Deterministic, no LLM."""
+    from ..db import jdump, now_iso
+
+    cov, w = coverage(db, matter_id), worth(db, matter_id)
+    db.execute("DELETE FROM facts WHERE matter_id=? AND kind IN ('coverage','worth')", (matter_id,))
+    for kind, model in (("coverage", cov), ("worth", w)):
+        cits: list[dict] = []
+        for a in getattr(model, "assumptions", []) or []:
+            cits += [c.model_dump(mode="json") for c in a.citations]
+        for f in ("carrier", "bi_per_person", "bi_per_accident", "um_uim", "medpay"):
+            cits += [c.model_dump(mode="json") for c in getattr(getattr(model, f, None), "citations", []) or []]
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, model, created_at) "
+                   "VALUES (?,?,?,?,?,?,?)", (matter_id, kind, model.model_dump_json(), jdump(cits), "publish",
+                                              "deterministic", now_iso()))
+    db.commit()
+    return {"coverage_confirmed": cov.confirmed, "worth": isinstance(w, WorthEstimate)}
