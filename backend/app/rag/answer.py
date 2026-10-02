@@ -185,7 +185,11 @@ def ask_stream(matter_id: int, user_id: int | None, question: str, history: list
                     elif block.name == "get_case_metrics":
                         yield "status", {"message": "Computing totals…"}
                         summary, hits = _metrics(db, matter_id, str(args.get("kind")))
-                        content = [{"type": "text", "text": summary}] + reg.blocks(hits)
+                        # A tool_result holding search_result blocks may contain ONLY search_result blocks, so the
+                        # computed total travels in the first result's title; the records themselves stay citable.
+                        content = reg.blocks(hits) or [{"type": "text", "text": summary}]
+                        if hits:
+                            content[0]["title"] = f"COMPUTED TOTAL — {summary} | {content[0]['title']}"
                     else:
                         content = [{"type": "text", "text": "Unknown tool"}]
                     results.append({"type": "tool_result", "tool_use_id": block.id, "content": content})

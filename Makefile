@@ -1,5 +1,5 @@
 # Case Pulse — common commands. Backend: uv + Python 3.12. Frontend: Next.js (frontend/).
-.PHONY: setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test fixtures
+.PHONY: clio-connect setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test fixtures
 
 PY := uv run python
 
@@ -18,6 +18,9 @@ backend:          ## API on :8000
 
 frontend:         ## UI on :3000
 	cd frontend && npm run dev
+
+clio-connect:     ## print a Clio OAuth link (backend must be running)
+	$(PY) -m backend.app.clio.connect
 
 sync:             ## pull every matter from Clio (READ-ONLY). MATTER=<clio id> to limit
 	$(PY) -m backend.app.sync $(if $(MATTER),--matter $(MATTER),)
