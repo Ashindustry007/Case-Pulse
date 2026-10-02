@@ -1,6 +1,8 @@
 # Workstream 2 — Product: Auth, Sharing & Frontend
 **Owner: Dev 2 · branch `feat/product` · master plan: [`docs/PLAN.md`](../PLAN.md). The master plan wins on any conflict.**
 
+> **No pre-existing scaffold.** Everything is defined in this repo's docs: the full layout is in PLAN §5.1, and `spec_sheet_v1.md` is superseded by PLAN.md. Ignore its `problem_adapter/`, `/jobs`, `/results` and `/review` references and its "no chat" non-goal. The team decided RAG Ask is in scope.
+
 ---
 
 ## 0. Paste this into your Claude Code session to start
@@ -8,6 +10,8 @@
 ```
 You are Dev 2 on a 2-person hackathon team (Swans "Law-Di-Gras" Applied AI Hackathon, deadline 4:00 PM today).
 Read docs/PLAN.md fully, then docs/workstreams/2-product-auth-sharing-frontend.md (your brief). Follow the brief exactly.
+docs/PLAN.md supersedes spec_sheet_v1.md: there is NO pre-existing scaffold (ignore problem_adapter/, /jobs, /results,
+/review); the repo layout is defined in docs/PLAN.md §5.1 — create frontend/ exactly as laid out there.
 You own: frontend/ (entire Next.js app), backend/app/sharing/, backend/app/api/{auth_routes,shares,provider}.py,
 backend/tests/test_{rbac,sharing}.py. Never edit files outside your ownership; frozen shared files
 (contracts.py, schema.sql, main.py, db.py, llm.py, auth.py) change only via a tiny commit to main announced to Dev 1.
@@ -108,7 +112,7 @@ Types come from `contracts.py` via `make types` (FastAPI OpenAPI → `frontend/l
 
 ### 2.1 Frontend scaffold (start immediately, only in `frontend/`)
 - Next.js 15 (App Router, TypeScript), Tailwind, shadcn/ui, Recharts, `openapi-typescript`, `lucide-react`.
-- Route groups:
+- Follow the `frontend/` tree in PLAN §5.1 (components split into `citations/`, `attorney/`, `provider/`). Route groups:
   - `app/(auth)/login`, `app/(auth)/invite/[code]`
   - `app/(attorney)/matters`, `app/(attorney)/matters/[id]`, `app/(attorney)/matters/[id]/share`, `app/(attorney)/costs`
   - `app/(provider)/provider/cases`, `app/(provider)/provider/cases/[grant]`

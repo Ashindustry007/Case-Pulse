@@ -1,6 +1,8 @@
 # Workstream 1 — Case Intelligence: Clio, OCR, RAG, AI digestion
 **Owner: Dev 1 · branch `feat/intelligence` · runs on Dev 1's Mac (embeddings are local) · master plan: [`docs/PLAN.md`](../PLAN.md). The master plan wins on any conflict.**
 
+> **No pre-existing scaffold.** Phase 0 creates every shared file in the layout from PLAN §5.1. `spec_sheet_v1.md` is superseded by PLAN.md.
+
 ---
 
 ## 0. Paste this into your Claude Code session to start
@@ -8,6 +10,7 @@
 ```
 You are Dev 1 on a 2-person hackathon team (Swans "Law-Di-Gras" Applied AI Hackathon, deadline 4:00 PM today).
 Read docs/PLAN.md fully, then docs/workstreams/1-case-intelligence.md (your brief). Follow the brief exactly.
+docs/PLAN.md supersedes spec_sheet_v1.md: there is NO pre-existing scaffold; build the repo layout in docs/PLAN.md §5.1.
 First do Phase 0 (contract scaffold) on main and push it as "contract: phase-0 scaffold" — Dev 2 is waiting on it.
 Then create branch feat/intelligence and execute tasks 1.1 → 1.12 in order, committing after each.
 You own: backend/app/{clio,sync,documents,ai,rag}/, backend/app/api/{sync,matters,records,brief,ask,digest,costs}.py,
@@ -39,6 +42,8 @@ Every fact must survive the judge clicking it (F3), and the second run must cost
 Frozen shared files (`contracts.py`, `schema.sql`, `main.py`, `db.py`, `llm.py`, `auth.py`) are created by you in Phase 0. After that push, change them only via tiny commits to `main` announced to Dev 2.
 
 ## 3. Phase 0: contract scaffold (≈ 30 min, on `main`, push immediately)
+
+Create exactly the shared files and directories marked *shared* or *Phase 0* in PLAN §5.1, plus `backend/app/stubs.py` (fixture loader) and empty package dirs for both devs' modules, so neither dev has to create a shared file later.
 
 - **Tooling.** `pyproject.toml` (uv, `requires-python >=3.12`): fastapi, uvicorn[standard], pydantic v2, anthropic, sqlite-vec, fastembed, pymupdf, httpx, argon2-cffi, pyjwt, python-dotenv, rapidfuzz, pyyaml, pytest. `uv python install 3.12`.
 - **Makefile:** `setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test`.

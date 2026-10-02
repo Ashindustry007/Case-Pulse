@@ -8,7 +8,9 @@ This plan adopts the spec sheet's F1–F9 **verbatim as acceptance criteria** (�
 
 1. **RAG "Ask the case" is IN scope.** The spec lists chat as a non-goal; the team lead decided to add it as a *secondary* "dig into everything" layer. Every sentence is cited, with highlight-to-source. The dashboard stays the primary, question-free surface, and the 90-second demo still leads with F1 → F3 → F5 → F6.
 2. **Provisioning = invite link → provider sets a password → provider login.** This is a real, separate provider account. It satisfies the spec's "access token/link" step, plus the team's two-login requirement. A demo role switcher is optional, never a substitute.
-3. **"Existing scaffold" (`problem_adapter/`, `/jobs`, `/results`, `/review`) is not in this repo.** If it exists elsewhere, push it to `main` before Phase 0 and Phase 0 will wire into it. Otherwise this plan's layout (`backend/` FastAPI + `frontend/` Next.js) is the scaffold.
+3. **There is no pre-existing scaffold (decided).** The spec's `problem_adapter/` and its `/jobs`, `/results`, `/review` pages were never built. **Ignore every reference to them.** This plan defines the entire repo from scratch (layout in §5.1), and Phase 0 creates it.
+
+**This file supersedes `spec_sheet_v1.md` wherever they differ.** Agents should read this file and their workstream brief, not the spec sheet.
 
 **Note on "activities feed":** in the Clio v4 API, `activities` are time and expense entries, not an audit log. F1's change feed is therefore built from sync-time diffs (§1 F1).
 
@@ -432,6 +434,57 @@ Every date, dollar figure, injury and claim carries ≥ 1 stored citation with a
 | `auth.py`: working login, JWT cookie, `current_user`, `require_role` | `backend/app/auth.py` | Dev 2 |
 | `llm.py`: `call_claude(purpose, model, matter_id, user_id, **kw)` → `ai_runs` | `backend/app/llm.py` | Dev 1 |
 | `scripts/smoke.py` (every endpoint vs contracts, as both roles) | `scripts/` | shared |
+
+### 5.1 Repo layout (the whole repo, defined here; Phase 0 creates every shared file)
+```
+SWANS-2026-Hackathon/
+├── README.md                     # submission README (stack, data location, models, $/case, how to run) — written at the end
+├── Makefile                      # setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test
+├── pyproject.toml  uv.lock       # Python 3.12 backend deps (uv)
+├── .env.example                  # every env var, documented; real .env is gitignored
+├── .gitignore                    # + data/ .env .venv/ node_modules/ .next/
+├── docs/
+│   ├── PLAN.md                   # this file (source of truth)
+│   └── workstreams/1-case-intelligence.md · 2-product-auth-sharing-frontend.md
+├── data/                         # GITIGNORED: casepulse.db, files/ (downloaded docs), pages/ (page PNGs)
+├── fixtures/                     # Phase 0 stub responses (generic synthetic data) — deleted by the freeze
+├── scripts/
+│   └── smoke.py                  # hits every endpoint as both roles, validates against contracts
+├── eval/                         # [1] questions.yaml + run.py (citation validity, cost)
+├── backend/
+│   ├── db/schema.sql             # [shared, frozen] all tables, SQLite dialect
+│   ├── app/
+│   │   ├── main.py               # [shared, frozen] FastAPI app, router auto-discovery, deny-by-default role check, CORS
+│   │   ├── db.py                 # [shared, frozen] connection (WAL, sqlite-vec), migrate()
+│   │   ├── contracts.py          # [shared, frozen] every Pydantic request/response model
+│   │   ├── auth.py               # [shared, frozen; Dev 2 hardens] login/JWT cookie, current_user, require_role, public
+│   │   ├── llm.py                # [shared, frozen; Dev 1] call_claude → ai_runs cost logging
+│   │   ├── stubs.py              # Phase 0 fixture loader — deleted by the freeze
+│   │   ├── clio/                 # [1] ClioClient (GET-only), OAuth
+│   │   ├── sync/                 # [1] resource sync, normalization, change tracking, CLI
+│   │   ├── documents/            # [1] download, page text, page PNGs, OCR
+│   │   ├── rag/                  # [1] chunking, embeddings, hybrid search, search_result builder, citation mapping/verification
+│   │   ├── ai/                   # [1] digests, extraction, value_model.yaml, brief, key moments, delta, ask, locate, drafts
+│   │   ├── sharing/              # [2] grants, policies, candidates, ProviderProjection, invites, events, request states
+│   │   └── api/                  # one router per file, auto-discovered
+│   │       ├── sync.py matters.py records.py brief.py ask.py digest.py costs.py      # [1]
+│   │       └── auth_routes.py shares.py provider.py                                 # [2]
+│   └── tests/
+│       ├── test_clio_readonly.py test_citations.py test_cache.py test_changes.py    # [1]
+│       └── test_rbac.py test_sharing.py                                             # [2]
+└── frontend/                     # [2] Next.js 15 App Router
+    ├── middleware.ts             # role routing (UX only)
+    ├── lib/api.ts  lib/api-types.ts (generated by `make types`)  lib/sse.ts
+    ├── components/
+    │   ├── citations/            # CitationChip, CitationPopover, SourceDrawer, Cited
+    │   ├── attorney/             # brief widgets, ask panel, share composer, audit, ai-cost
+    │   └── provider/             # heartbeat, requests, bills, documents (pure; reused by composer preview)
+    └── app/
+        ├── (auth)/login  (auth)/invite/[code]
+        ├── (attorney)/matters  (attorney)/matters/[id]  (attorney)/matters/[id]/share  (attorney)/costs
+        └── (provider)/provider/cases  (provider)/provider/cases/[grant]
+```
+**Ports:** backend `:8000`, frontend `:3000`. **Run:** `make setup migrate seed-attorney`, then `make backend` and `make frontend` in two terminals.
 
 **Endpoint contract** (owner in brackets; role in braces):
 ```
