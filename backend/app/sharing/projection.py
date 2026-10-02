@@ -12,7 +12,8 @@ from datetime import date
 from typing import get_args
 
 from ..config import settings
-from ..contracts import (Adherence, CaseValueShare, Coverage, CoverageShare, Heartbeat, HeartbeatState, Movement,
+from ..contracts import (Adherence, CaseDetail, CaseDetailOption, CaseValueShare, Coverage, CoverageShare, Heartbeat,
+                         HeartbeatState, Movement,
                          OtherCare, ProviderBills, ProviderCase, ProviderRequest, SharedDocument, ShareField,
                          SharePolicy)
 from ..db import now_iso
@@ -42,6 +43,7 @@ class Sections:
     documents: list[SharedDocument]
     adherence: Adherence | None
     other_care: list[OtherCare]
+    case_details: list[CaseDetailOption]
 
 
 def build_sections(db: sqlite3.Connection, matter_id: int, provider_contact_id: int) -> Sections:
@@ -67,6 +69,7 @@ def build_sections(db: sqlite3.Connection, matter_id: int, provider_contact_id: 
         documents=sources.documents(db, matter_id),
         adherence=_adherence(visits, provider_contact_id, today),
         other_care=_other_care(visits, provider_contact_id),
+        case_details=sources.case_detail_options(db, matter_id),
     )
 
 
@@ -93,13 +96,18 @@ def project(s: Sections, *, grant_id: int, policy: SharePolicy, shared_by: str |
         out["adherence"] = s.adherence
     if "other_care" in granted:
         out["other_care"] = s.other_care or None
+    if "case_details" in granted:
+        chosen = set(policy.case_fields)
+        out["case_details"] = [CaseDetail(label=o.label, value=o.value) for o in s.case_details if o.id in chosen]
     return ProviderCase(**out)
 
 
-def preview_policy(grant_id: int, documents: list[SharedDocument]) -> SharePolicy:
+def preview_policy(grant_id: int, documents: list[SharedDocument],
+                   case_details: list[CaseDetailOption] | None = None) -> SharePolicy:
     """Everything granted: share-candidates uses it so the composer can filter the same projection client-side."""
     return SharePolicy(grant_id=grant_id, version=0, fields=ALL_FIELDS, document_ids=[d.id for d in documents],
-                       coverage_detail="limits", released_at=now_iso())
+                       case_fields=[o.id for o in case_details or []], coverage_detail="limits",
+                       released_at=now_iso())
 
 
 def _coverage_variants(cov: Coverage | None) -> dict[str, CoverageShare]:

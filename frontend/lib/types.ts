@@ -43,3 +43,5 @@ export type ReleaseResult = S["ReleaseResult"];
 export type ShareAudit = S["ShareAudit"];
 export type ShareEvent = S["ShareEvent"];
 export type ShareField = S["ReleaseRequest"]["fields"][number];
+export type CaseDetailOption = S["CaseDetailOption"];
+export type CaseDetail = S["CaseDetail"];

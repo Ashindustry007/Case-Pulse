@@ -17,6 +17,8 @@ Anything missing is treated as "not available" → the provider section is omitt
 | Provider requests | `provider_requests` (schema as frozen) | `citations` JSON `[Citation]`; `source_addressed_to_provider` 0/1 |
 | Coverage | latest `facts` row `kind='coverage'` | `value` = `contracts.Coverage` JSON |
 | Case value | latest `facts` row `kind='worth'` | `value` = `contracts.WorthEstimate` or `contracts.NotFound` JSON |
+| Case details (F5) | `records` with `type='custom_field'`, `meta.field_name` / `meta.value`; `digests.confidential` | listed by `sources.case_detail_options`; confidential = digest flag OR strategy-like field name |
+| Bills from documents | `facts` rows `kind='provider_bill'` (when the PI add-on's `medical_bill` records are unavailable) | `value` = `{"provider_contact_id": int, "provider_name", "amount", "balance", "lien", "bill_date"}` |
 | Treatment visits | `facts` rows `kind='treatment_visit'` (one row per visit) | `value` = `{"provider_contact_id": int\|null, "provider_name": str, "date": "YYYY-MM-DD", "description": str\|null}` |
 
 API conventions both sides follow:

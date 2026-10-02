@@ -21,9 +21,10 @@ import { AuditTimeline } from "./AuditTimeline";
 
 const FIELDS: [ShareField, string][] = [
   ["status", "Status & heartbeat"], ["coverage", "Coverage"], ["case_value", "Case value"], ["bills", "Their bills"],
-  ["open_requests", "Open requests"], ["documents", "Documents"], ["adherence", "Treatment adherence"], ["other_care", "Other providers' care"],
+  ["open_requests", "Open requests"], ["documents", "Documents / medical records"], ["case_details", "Case details"],
+  ["adherence", "Treatment adherence"], ["other_care", "Other providers' care"],
 ];
-const DEFAULT: Toggles = { fields: ["status", "open_requests"], document_ids: [], coverage_detail: "confirmed", status_note: "" };
+const DEFAULT: Toggles = { fields: ["status", "open_requests"], document_ids: [], case_fields: [], coverage_detail: "confirmed", status_note: "" };
 
 const toastError = (e: unknown) => toast.error(e instanceof ApiError ? e.message : String(e));
 
@@ -48,14 +49,21 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
   const last = audit.data?.versions.at(-1)?.policy;
   const resetKey = `${contactId}|${audit.data?.grant.id}|${last?.version}`;   // stable ids: audit reloads (dismiss) keep unsaved edits
   useEffect(() => {   // start from the latest released policy, if any
-    setT(last ? { fields: last.fields, document_ids: last.document_ids, coverage_detail: last.coverage_detail, status_note: last.status_note ?? "" } : DEFAULT);
+    setT(last ? { fields: last.fields, document_ids: last.document_ids, case_fields: last.case_fields ?? [], coverage_detail: last.coverage_detail, status_note: last.status_note ?? "" } : DEFAULT);
     setFlags([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
 
   const preview = useMemo(() => (candidates.data ? applyPolicy(candidates.data, t) : null), [candidates.data, t]);
   const openFlags = flags.filter((f) => t.status_note.includes(f.text));   // a flag clears once its text is edited out
-  const toggle = (f: ShareField, on: boolean) => setT((s) => ({ ...s, fields: on ? [...s.fields, f] : s.fields.filter((x) => x !== f) }));
+  const toggle = (f: ShareField, on: boolean) => setT((s) => {
+    const fields = on ? [...s.fields, f] : s.fields.filter((x) => x !== f);
+    // First time case details are switched on: pre-select only the details recommended as safe for providers.
+    const case_fields = f === "case_details" && on && s.case_fields.length === 0
+      ? (candidates.data?.case_detail_options ?? []).filter((o) => o.recommended).map((o) => o.id) : s.case_fields;
+    return { ...s, fields, case_fields };
+  });
+  const toggleDetail = (id: string, on: boolean) => setT((s) => ({ ...s, case_fields: on ? [...s.case_fields, id] : s.case_fields.filter((x) => x !== id) }));
   const nextVersion = (grant?.latest_version ?? 0) + 1;
 
   async function draft() {
@@ -73,7 +81,11 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
     try {
       const g = grant ?? await api<Grant>("/api/shares", { json: { matter_id: matterId, provider_contact_id: contactId, email: email.trim() } });
       const r = await api<ReleaseResult>(`/api/shares/${g.id}/release`, {
-        json: { fields: t.fields, document_ids: t.fields.includes("documents") ? t.document_ids : [], coverage_detail: t.coverage_detail, status_note: t.status_note || null },
+        json: {
+          fields: t.fields, document_ids: t.fields.includes("documents") ? t.document_ids : [],
+          case_fields: t.fields.includes("case_details") ? t.case_fields : [],
+          coverage_detail: t.coverage_detail, status_note: t.status_note || null,
+        },
       });
       toast.success(`Released v${r.policy.version}`);
       if (r.invite_url) toast(`Invite link (also in server console): ${r.invite_url}`, { duration: 20000 });
@@ -129,6 +141,22 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
                       <label key={d.id} className="flex items-center gap-2 text-xs">
                         <Checkbox checked={t.document_ids.includes(d.id)} onCheckedChange={(v) => setT((s) => ({ ...s, document_ids: v === true ? [...s.document_ids, d.id] : s.document_ids.filter((x) => x !== d.id) }))} />
                         {d.title}{d.page_count && ` (${d.page_count} pp)`}
+                        {d.category && <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{d.category}</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {f === "case_details" && t.fields.includes("case_details") && (
+                  <div className="ml-6 mt-1 space-y-1">
+                    {(candidates.data?.case_detail_options ?? []).length === 0 && <p className="text-xs text-muted-foreground">No case details in the file.</p>}
+                    {candidates.data?.case_detail_options?.map((o) => (
+                      <label key={o.id} className="flex items-start gap-2 text-xs" title={o.value}>
+                        <Checkbox checked={t.case_fields.includes(o.id)} onCheckedChange={(v) => toggleDetail(o.id, v === true)} />
+                        <span>
+                          <span className="font-medium">{o.label}</span>
+                          <span className="block max-w-[260px] truncate text-muted-foreground">{o.value}</span>
+                          {o.confidential && <span className="text-amber-700">⚠ confidential — not recommended for providers</span>}
+                        </span>
                       </label>
                     ))}
                   </div>

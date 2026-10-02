@@ -36,6 +36,18 @@ export function ProviderCaseView({ c, onMarkSent, docHref, preview }: Props) {
         </CardContent></Card>
       )}
       {c.status_note && <Card><CardContent className="pt-4 text-sm">{c.status_note}</CardContent></Card>}
+      {c.case_details?.length ? (
+        <Section title="Case details">
+          <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-4 gap-y-1">
+            {c.case_details.map((d) => (
+              <div key={d.label} className="contents">
+                <dt className="text-muted-foreground">{d.label}</dt>
+                <dd className="whitespace-pre-line">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      ) : null}
       {c.coverage && (
         <Section title="Coverage">
           {c.coverage.confirmed ? "✔ Coverage confirmed" : "Coverage not yet confirmed"}

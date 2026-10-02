@@ -23,7 +23,9 @@ def get_grant(db: sqlite3.Connection, grant_id: int) -> sqlite3.Row:
 
 def _policy(row: sqlite3.Row) -> SharePolicy:
     return SharePolicy(grant_id=row["grant_id"], version=row["version"], fields=jload(row["fields"], []),
-                       document_ids=jload(row["document_ids"], []), coverage_detail=row["coverage_detail"],
+                       document_ids=jload(row["document_ids"], []),
+                       case_fields=jload(row["case_fields"], []) if "case_fields" in row.keys() else [],
+                       coverage_detail=row["coverage_detail"],
                        status_note=row["status_note"], released_by=row["released_by_name"],
                        released_at=row["released_at"])
 
@@ -78,14 +80,19 @@ def release(db: sqlite3.Connection, grant_id: int, body: ReleaseRequest, user: s
     unknown = set(body.document_ids) - {d.id for d in sources.documents(db, grant["matter_id"])}
     if unknown:
         raise HTTPException(400, f"Not documents of this matter: {sorted(unknown)}")
+    unknown_fields = set(body.case_fields) - {o.id for o in sources.case_detail_options(db, grant["matter_id"])}
+    if unknown_fields:
+        raise HTTPException(400, f"Not case details of this matter: {sorted(unknown_fields)}")
     fields, docs = list(dict.fromkeys(body.fields)), list(dict.fromkeys(body.document_ids))
+    case_fields = list(dict.fromkeys(body.case_fields)) if "case_details" in fields else []
     version = db.execute("SELECT COALESCE(MAX(version), 0) + 1 AS v FROM share_policies WHERE grant_id = ?",
                          (grant_id,)).fetchone()["v"]
-    db.execute("INSERT INTO share_policies(grant_id, version, fields, document_ids, coverage_detail, status_note, "
-               "released_by, released_at) VALUES (?,?,?,?,?,?,?,?)",
-               (grant_id, version, jdump(fields), jdump(docs), body.coverage_detail,
+    db.execute("INSERT INTO share_policies(grant_id, version, fields, document_ids, case_fields, coverage_detail, "
+               "status_note, released_by, released_at) VALUES (?,?,?,?,?,?,?,?,?)",
+               (grant_id, version, jdump(fields), jdump(docs), jdump(case_fields), body.coverage_detail,
                 (body.status_note or "").strip() or None, user["id"], now_iso()))
-    events.log_event(db, grant_id, "released", user, version=version, meta={"fields": fields, "document_ids": docs})
+    events.log_event(db, grant_id, "released", user, version=version,
+                     meta={"fields": fields, "document_ids": docs, "case_fields": case_fields})
     invite_url = None
     if grant["provider_user_id"] is None:
         existing = db.execute("SELECT id FROM users WHERE email = ? AND role = 'provider'",
@@ -108,7 +115,7 @@ def revoke(db: sqlite3.Connection, grant_id: int, user: sqlite3.Row) -> None:
 
 
 def _diff_keys(p: SharePolicy) -> set[str]:
-    keys = set(p.fields) | set(p.document_ids)
+    keys = set(p.fields) | set(p.document_ids) | set(p.case_fields)
     if "coverage" in p.fields:
         keys.add(f"coverage:{p.coverage_detail}")
     return keys
@@ -131,7 +138,7 @@ def candidates(db: sqlite3.Connection, matter_id: int, provider_contact_id: int)
     s = projection.build_sections(db, matter_id, provider_contact_id)
     active = _active_grant(db, matter_id, provider_contact_id)
     grant_id = active["id"] if active else 0
-    case = projection.project(s, grant_id=grant_id, policy=projection.preview_policy(grant_id, s.documents),
-                              shared_by=None)
+    case = projection.project(s, grant_id=grant_id,
+                              policy=projection.preview_policy(grant_id, s.documents, s.case_details), shared_by=None)
     return ShareCandidates(provider=ident, case=case, coverage_variants=s.coverage_variants,
-                           available_documents=s.documents)
+                           available_documents=s.documents, case_detail_options=s.case_details)

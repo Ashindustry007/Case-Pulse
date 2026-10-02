@@ -12,8 +12,10 @@ from pathlib import Path
 from pydantic import TypeAdapter, ValidationError
 
 from ..config import settings
-from ..contracts import (BillLine, Coverage, Movement, NotFound, ProviderBills, ProviderIdentity, SharedDocument,
-                         StageShare, WorthEstimate)
+import re
+
+from ..contracts import (BillLine, CaseDetailOption, Coverage, Movement, NotFound, ProviderBills, ProviderIdentity,
+                         SharedDocument, StageShare, WorthEstimate)
 from ..db import jload
 
 
@@ -84,7 +86,7 @@ def provider_bills(db: sqlite3.Connection, matter_id: int, contact_id: int) -> P
         print(f"[sharing] ignoring malformed medical_bill meta for matter {matter_id}: {e}")
         return None
     if not rows:
-        return None
+        return _extracted_bills(db, matter_id, contact_id)
     metas = [_meta(r["meta"]) for r in rows]
     try:
         balances = [float(m["balance"]) for m in metas if m.get("balance") is not None]
@@ -99,11 +101,59 @@ def provider_bills(db: sqlite3.Connection, matter_id: int, contact_id: int) -> P
         return None
 
 
+_DOC_CATEGORY = {"injury_medical": "Medical records", "treatment": "Medical records", "billing_liens": "Medical bills",
+                 "coverage_insurance": "Insurance", "litigation": "Litigation", "negotiation": "Negotiation",
+                 "liability": "Liability", "client_communication": "Correspondence", "admin": "Administrative"}
+
+
 def documents(db: sqlite3.Connection, matter_id: int) -> list[SharedDocument]:
-    rows = db.execute("SELECT r.id, r.title, (SELECT COUNT(*) FROM document_pages p WHERE p.document_id = r.id) AS pages "
-                      "FROM records r WHERE r.matter_id = ? AND r.type = 'document' AND r.deleted_at IS NULL "
+    rows = db.execute("SELECT r.id, r.title, r.meta, d.category, "
+                      "(SELECT COUNT(*) FROM document_pages p WHERE p.document_id = r.id) AS pages "
+                      "FROM records r LEFT JOIN digests d ON d.record_id = r.id "
+                      "WHERE r.matter_id = ? AND r.type = 'document' AND r.deleted_at IS NULL "
                       "ORDER BY r.occurred_at DESC, r.id", (matter_id,))
-    return [SharedDocument(id=r["id"], title=r["title"] or "Document", page_count=r["pages"] or None) for r in rows]
+    return [SharedDocument(id=r["id"], title=r["title"] or "Document", page_count=r["pages"] or None,
+                           category=_meta(r["meta"]).get("category") or _DOC_CATEGORY.get(r["category"] or "")
+                           or ((r["category"] or "").replace("_", " ").capitalize() or None)) for r in rows]
+
+
+# Field names that read as strategy / valuation / opinion: flagged confidential even before digests exist.
+_CONFIDENTIAL_NAME = re.compile(r"rationale|assessment|strategy|valuation|case value|settlement|prior|credib|"
+                                r"opinion|reserve|authority|internal|demand amount", re.I)
+
+
+def case_detail_options(db: sqlite3.Connection, matter_id: int) -> list[CaseDetailOption]:
+    """The matter's case details (Clio custom fields) an attorney may share, with confidentiality flags."""
+    rows = db.execute("SELECT r.id, r.meta, r.body_text, d.confidential FROM records r "
+                      "LEFT JOIN digests d ON d.record_id = r.id WHERE r.matter_id = ? AND r.type = 'custom_field' "
+                      "AND r.deleted_at IS NULL ORDER BY r.id", (matter_id,)).fetchall()
+    out = []
+    for r in rows:
+        meta = _meta(r["meta"])
+        label = meta.get("field_name") or (r["body_text"] or "").split(":", 1)[0] or "Detail"
+        value = str(meta.get("value") if meta.get("value") is not None else (r["body_text"] or "").split(":", 1)[-1]).strip()
+        confidential = bool(r["confidential"]) or bool(_CONFIDENTIAL_NAME.search(label))
+        out.append(CaseDetailOption(id=r["id"], label=label, value=value, confidential=confidential,
+                                    recommended=not confidential))
+    return out
+
+
+def _extracted_bills(db: sqlite3.Connection, matter_id: int, contact_id: int) -> ProviderBills | None:
+    """Bills Dev 1 extracted (with citations) from billing documents when the PI add-on's bills are unavailable."""
+    rows = db.execute("SELECT value FROM facts WHERE matter_id = ? AND kind = 'provider_bill'", (matter_id,))
+    items = [v for v in (jload(r["value"], {}) for r in rows)
+             if isinstance(v, dict) and v.get("provider_contact_id") == contact_id and v.get("amount") is not None]
+    if not items:
+        return None
+    try:
+        balances = [float(v["balance"]) for v in items if v.get("balance") is not None]
+        return ProviderBills(billed=sum(float(v["amount"]) for v in items), balance=sum(balances) if balances else None,
+                             lien=any(bool(v.get("lien")) for v in items),
+                             items=[BillLine(date=(v.get("bill_date") or "")[:10] or None, amount=float(v["amount"]),
+                                             description=v.get("description") or "Itemized bill") for v in items])
+    except (TypeError, ValueError, ValidationError) as e:
+        print(f"[sharing] ignoring malformed provider_bill fact for matter {matter_id}: {e}")
+        return None
 
 
 def document_path(db: sqlite3.Connection, matter_id: int, document_id: str) -> Path | None:

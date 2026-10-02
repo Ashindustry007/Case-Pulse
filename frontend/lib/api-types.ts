@@ -548,6 +548,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Provider Requests */
+        get: operations["provider_requests_api_matters__matter_id__requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shares": {
         parameters: {
             query?: never;
@@ -861,6 +878,41 @@ export interface components {
              * @description True if records changed since the last digest run
              */
             stale: boolean;
+        };
+        /**
+         * CaseDetail
+         * @description A case detail as the provider sees it (label + value only).
+         */
+        CaseDetail: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * CaseDetailOption
+         * @description One case detail (a Clio custom field of the matter) the attorney may choose to share (composer only).
+         */
+        CaseDetailOption: {
+            /**
+             * Id
+             * @description records.id of the custom_field record
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+            /**
+             * Confidential
+             * @description Strategy/valuation/opinion content — warn before sharing
+             */
+            confidential: boolean;
+            /**
+             * Recommended
+             * @description Safe, useful default for a treating provider
+             */
+            recommended: boolean;
         };
         /** CaseValueShare */
         CaseValueShare: {
@@ -1461,6 +1513,8 @@ export interface components {
             adherence?: components["schemas"]["Adherence"] | null;
             /** Other Care */
             other_care?: components["schemas"]["OtherCare"][] | null;
+            /** Case Details */
+            case_details?: components["schemas"]["CaseDetail"][] | null;
         };
         /** ProviderCaseSummary */
         ProviderCaseSummary: {
@@ -1492,7 +1546,7 @@ export interface components {
             /** Provider Contact Id */
             provider_contact_id: number;
             /** Fields */
-            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care")[];
+            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care" | "case_details")[];
         };
         /** ProviderIdentity */
         ProviderIdentity: {
@@ -1586,9 +1640,14 @@ export interface components {
         /** ReleaseRequest */
         ReleaseRequest: {
             /** Fields */
-            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care")[];
+            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care" | "case_details")[];
             /** Document Ids */
             document_ids?: string[];
+            /**
+             * Case Fields
+             * @description CaseDetailOption ids to share (used when "case_details" is in fields)
+             */
+            case_fields?: string[];
             /**
              * Coverage Detail
              * @default confirmed
@@ -1632,6 +1691,8 @@ export interface components {
             };
             /** Available Documents */
             available_documents: components["schemas"]["SharedDocument"][];
+            /** Case Detail Options */
+            case_detail_options?: components["schemas"]["CaseDetailOption"][];
         };
         /** ShareEvent */
         ShareEvent: {
@@ -1662,9 +1723,11 @@ export interface components {
             /** Version */
             version: number;
             /** Fields */
-            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care")[];
+            fields: ("status" | "coverage" | "case_value" | "bills" | "open_requests" | "documents" | "adherence" | "other_care" | "case_details")[];
             /** Document Ids */
             document_ids: string[];
+            /** Case Fields */
+            case_fields?: string[];
             /**
              * Coverage Detail
              * @enum {string}
@@ -1690,6 +1753,11 @@ export interface components {
             shared_at?: string | null;
             /** Page Count */
             page_count?: number | null;
+            /**
+             * Category
+             * @description e.g. "Medical records", "Medical bills", "Pleadings"
+             */
+            category?: string | null;
         };
         /** SourceRecord */
         SourceRecord: {
@@ -2882,6 +2950,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Grant"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provider_requests_api_matters__matter_id__requests_get: {
+        parameters: {
+            query: {
+                provider_contact_id: number;
+            };
+            header?: never;
+            path: {
+                matter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderRequest"][];
                 };
             };
             /** @description Validation Error */

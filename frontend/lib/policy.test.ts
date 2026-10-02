@@ -6,6 +6,10 @@ const candidates = {
   provider: { contact_id: 600, name: "Provider A" },
   coverage_variants: { confirmed: { confirmed: true }, limits: { confirmed: true, carrier: "Acme", limits_text: "BI per person $100,000" } },
   available_documents: [{ id: "document:10", title: "Report" }, { id: "document:11", title: "Memo" }],
+  case_detail_options: [
+    { id: "custom_field:1:a", label: "Date of Incident", value: "2023-04-23", confidential: false, recommended: true },
+    { id: "custom_field:1:b", label: "Case Value Rationale", value: "secret", confidential: true, recommended: false },
+  ],
   case: {
     grant_id: 0, policy_version: 0, patient_display: "P. E.", firm_name: "Firm",
     heartbeat: { state: "active", recent_movement: [] },
@@ -20,7 +24,7 @@ const candidates = {
   },
 } as unknown as ShareCandidates;
 
-const t = (o: Partial<Toggles>): Toggles => ({ fields: [], document_ids: [], coverage_detail: "confirmed", status_note: "", ...o });
+const t = (o: Partial<Toggles>): Toggles => ({ fields: [], document_ids: [], case_fields: [], coverage_detail: "confirmed", status_note: "", ...o });
 
 describe("applyPolicy", () => {
   it("keeps only identity keys when nothing is toggled", () => {
@@ -46,5 +50,10 @@ describe("applyPolicy", () => {
     const c = applyPolicy(candidates, t({ fields: ["other_care"], status_note: "  Hi  " }));
     expect("other_care" in c).toBe(false);
     expect(c.status_note).toBe("Hi");
+  });
+  it("shares only the chosen case details, as label/value pairs", () => {
+    const c = applyPolicy(candidates, t({ fields: ["case_details"], case_fields: ["custom_field:1:a"] }));
+    expect(c.case_details).toEqual([{ label: "Date of Incident", value: "2023-04-23" }]);
+    expect("case_details" in applyPolicy(candidates, t({ case_fields: ["custom_field:1:a"] }))).toBe(false);
   });
 });

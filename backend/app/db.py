@@ -68,10 +68,17 @@ def get_db() -> Iterator[sqlite3.Connection]:
         yield conn
 
 
+# Additive column migrations for databases created before a column existed: (table, column, DDL).
+ADDED_COLUMNS = [("share_policies", "case_fields", "TEXT NOT NULL DEFAULT '[]'")]
+
+
 def migrate(path: Path | str | None = None) -> None:
     with connect(path) as conn:
         conn.executescript(SCHEMA.read_text())
         conn.executescript(VIRTUAL_TABLES)
+        for table, col, ddl in ADDED_COLUMNS:
+            if col not in {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
 
 
 def jload(value: str | None, default: Any = None) -> Any:

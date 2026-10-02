@@ -283,6 +283,7 @@ CREATE TABLE IF NOT EXISTS share_policies (
   version         INTEGER NOT NULL,
   fields          TEXT NOT NULL,            -- JSON array of ShareField
   document_ids    TEXT NOT NULL DEFAULT '[]',
+  case_fields     TEXT NOT NULL DEFAULT '[]',   -- custom_field record ids shared as "case details"
   coverage_detail TEXT NOT NULL DEFAULT 'confirmed' CHECK (coverage_detail IN ('confirmed','limits')),
   status_note     TEXT,
   released_by     INTEGER REFERENCES users(id),

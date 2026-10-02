@@ -1,9 +1,9 @@
 /** Client mirror of backend sharing/projection.py:project(). Keep the two in lockstep; tests pin both. */
 import type { ProviderCase, ShareCandidates, ShareField } from "./types";
 
-export type Toggles = { fields: ShareField[]; document_ids: string[]; coverage_detail: "confirmed" | "limits"; status_note: string };
+export type Toggles = { fields: ShareField[]; document_ids: string[]; case_fields: string[]; coverage_detail: "confirmed" | "limits"; status_note: string };
 
-const SECTIONS = ["heartbeat", "coverage", "case_value", "bills", "requests", "documents", "adherence", "other_care", "status_note", "shared_by", "updated_at"] as const;
+const SECTIONS = ["heartbeat", "coverage", "case_value", "bills", "requests", "documents", "adherence", "other_care", "case_details", "status_note", "shared_by", "updated_at"] as const;
 
 export function applyPolicy(c: ShareCandidates, t: Toggles): ProviderCase {
   const out: Record<string, unknown> = { ...c.case };
@@ -19,5 +19,9 @@ export function applyPolicy(c: ShareCandidates, t: Toggles): ProviderCase {
   if (on.has("documents")) { const ids = new Set(t.document_ids); put("documents", c.available_documents.filter((d) => ids.has(d.id))); }
   if (on.has("adherence")) put("adherence", c.case.adherence);
   if (on.has("other_care")) put("other_care", c.case.other_care?.length ? c.case.other_care : null);
+  if (on.has("case_details")) {
+    const ids = new Set(t.case_fields);
+    put("case_details", (c.case_detail_options ?? []).filter((o) => ids.has(o.id)).map((o) => ({ label: o.label, value: o.value })));
+  }
   return out as ProviderCase;
 }

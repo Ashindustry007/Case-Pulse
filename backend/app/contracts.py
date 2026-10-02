@@ -22,6 +22,7 @@ RecordType = Literal[
 Role = Literal["attorney", "provider"]
 ShareField = Literal[
     "status", "coverage", "case_value", "bills", "open_requests", "documents", "adherence", "other_care",
+    "case_details",
 ]
 HeartbeatState = Literal["active", "quiet", "dormant", "closed"]
 
@@ -560,6 +561,22 @@ class SharedDocument(_Model):
     title: str
     shared_at: str | None = None
     page_count: int | None = None
+    category: str | None = Field(default=None, description='e.g. "Medical records", "Medical bills", "Pleadings"')
+
+
+class CaseDetailOption(_Model):
+    """One case detail (a Clio custom field of the matter) the attorney may choose to share (composer only)."""
+    id: str = Field(description="records.id of the custom_field record")
+    label: str
+    value: str
+    confidential: bool = Field(description="Strategy/valuation/opinion content — warn before sharing")
+    recommended: bool = Field(description="Safe, useful default for a treating provider")
+
+
+class CaseDetail(_Model):
+    """A case detail as the provider sees it (label + value only)."""
+    label: str
+    value: str
 
 
 class Adherence(_Model):
@@ -591,6 +608,7 @@ class ProviderCase(_Model):
     documents: list[SharedDocument] | None = None
     adherence: Adherence | None = None
     other_care: list[OtherCare] | None = None
+    case_details: list[CaseDetail] | None = None
 
 
 class ProviderCaseSummary(_Model):
@@ -614,6 +632,7 @@ class ShareCandidates(_Model):
     case: ProviderCase = Field(description="All sections populated (coverage per coverage_variants)")
     coverage_variants: dict[str, CoverageShare] = Field(description='{"confirmed": ..., "limits": ...}')
     available_documents: list[SharedDocument]
+    case_detail_options: list[CaseDetailOption] = Field(default_factory=list)
 
 
 class CreateGrantRequest(_Model):
@@ -639,6 +658,8 @@ class Grant(_Model):
 class ReleaseRequest(_Model):
     fields: list[ShareField]
     document_ids: list[str] = Field(default_factory=list)
+    case_fields: list[str] = Field(default_factory=list,
+                                   description='CaseDetailOption ids to share (used when "case_details" is in fields)')
     coverage_detail: Literal["confirmed", "limits"] = "confirmed"
     status_note: str | None = None
 
@@ -648,6 +669,7 @@ class SharePolicy(_Model):
     version: int
     fields: list[ShareField]
     document_ids: list[str]
+    case_fields: list[str] = Field(default_factory=list)
     coverage_detail: Literal["confirmed", "limits"]
     status_note: str | None = None
     released_by: str | None = None
