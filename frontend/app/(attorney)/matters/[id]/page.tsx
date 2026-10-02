@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { use } from "react";
+import { BriefGrid } from "@/components/attorney/BriefGrid";
+import { KeyMoments } from "@/components/attorney/KeyMoments";
 import { MatterHeader } from "@/components/attorney/MatterHeader";
 import { SinceLastVisit } from "@/components/attorney/SinceLastVisit";
 import { ErrorNote, Loading } from "@/components/common/states";
@@ -28,9 +30,9 @@ export default function MatterPage({ params }: { params: Promise<{ id: string }>
           </div>
           <TabsContent value="brief" className="space-y-4">
             <SinceLastVisit matterId={matterId} />
-            {/* Task 6: BriefGrid */}
+            <BriefGrid matterId={matterId} />
           </TabsContent>
-          <TabsContent value="deep">{/* Task 6: full ranked timeline (Deep-Dive stretch) */}</TabsContent>
+          <TabsContent value="deep"><KeyMoments matterId={matterId} showAll /></TabsContent>
           <TabsContent value="cost">{/* Task 13: AiCostTab */}</TabsContent>
         </Tabs>
       </main>
