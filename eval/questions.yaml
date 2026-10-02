@@ -1,0 +1,12 @@
+# Generic attorney questions (from the hackathon brief's quotes). Case-agnostic: no names or facts of any matter.
+questions:
+  - What are the client's primary injuries, and where in the file are they documented?
+  - What insurance coverage is behind this case, and what are the limits?
+  - How much has the firm spent on this case so far?
+  - When did anyone at the firm last actually talk to the client?
+  - What is overdue right now, and what are we waiting on from others?
+  - What are the total medical specials, and which providers billed the most?
+  - Has the client had surgery? When, what, and by whom?
+  - What does the defense medical examination (IME) conclude?
+  - What are the next court or discovery deadlines?
+  - Is the client still treating, and are there gaps in treatment?
