@@ -26,8 +26,8 @@ def citation_valid(db, c: dict) -> bool:
     if row is None:
         return False
     span = row["text"][c["char_start"]:c["char_end"]]
-    norm = lambda s: " ".join(s.split())  # noqa: E731
-    return norm(span) == norm(c["excerpt"]) or norm(c["excerpt"]) in norm(span) or norm(span) in norm(c["excerpt"])
+    norm = lambda s: "".join(s.split())  # noqa: E731 — whitespace-insensitive (PDF line breaks)
+    return norm(span) == norm(c["excerpt"])
 
 
 def main() -> int:

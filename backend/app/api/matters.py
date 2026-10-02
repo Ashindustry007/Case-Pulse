@@ -4,6 +4,7 @@ from __future__ import annotations
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from ..ai import views
 from ..auth import require_role
@@ -69,3 +70,17 @@ def costs(matter_id: int, db: sqlite3.Connection = Depends(get_db)):
 def providers(matter_id: int, db: sqlite3.Connection = Depends(get_db)):
     get_matter(db, matter_id)
     return Providers(providers=views.provider_summaries(db, matter_id))
+
+
+@router.get("/{matter_id}/client-photo", summary="Cropped client photo (from Clio avatar or a photo/ID document)")
+def client_photo(matter_id: int, db: sqlite3.Connection = Depends(get_db)):
+    from pathlib import Path
+
+    from ..db import jload
+
+    row = db.execute("SELECT value FROM facts WHERE matter_id=? AND kind='client_photo' ORDER BY id DESC LIMIT 1",
+                     (matter_id,)).fetchone()
+    path = (jload(row["value"], {}) or {}).get("image_path") if row else None
+    if not path or not Path(path).exists():
+        raise HTTPException(404, "No client photo found in the file")
+    return FileResponse(path, media_type="image/png")

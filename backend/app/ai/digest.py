@@ -113,6 +113,18 @@ def digest_matter(db: sqlite3.Connection, matter_id: int, workers: int = 4) -> d
         return stats
     ctx_text = context_block(matter_context(db, matter_id))
     batches = [todo[i:i + BATCH] for i in range(0, len(todo), BATCH)]
+    retry: list[tuple[sqlite3.Row, str, str]] = []
+    for attempt in range(2):  # 2nd pass retries items the model skipped, in small batches
+        if attempt == 1:
+            if not retry:
+                break
+            batches, retry = [retry[i:i + 3] for i in range(0, len(retry), 3)], []
+        _digest_batches(db, matter_id, ctx_text, batches, workers, stats, retry, final=attempt == 1)
+    return stats
+
+
+def _digest_batches(db: sqlite3.Connection, matter_id: int, ctx_text: str, batches: list, workers: int, stats: dict,
+                    retry: list, *, final: bool) -> None:
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futs = {pool.submit(_run_batch, matter_id, ctx_text, b): b for b in batches}
         for fut in as_completed(futs):
@@ -121,14 +133,20 @@ def digest_matter(db: sqlite3.Connection, matter_id: int, workers: int = 4) -> d
                 items, cost, model = fut.result()
             except Exception as e:  # noqa: BLE001
                 log.warning("digest batch failed: %s", e)
-                stats["errors"] += len(batch)
+                if final:
+                    stats["errors"] += len(batch)
+                else:
+                    retry.extend(batch)
                 continue
             by_id = {i.record_id: i for i in items}
             total_chars = sum(len(t) for _, t, _ in batch) or 1
             for r, text, h in batch:
                 d = by_id.get(r["id"])
                 if d is None:
-                    stats["errors"] += 1
+                    if final:
+                        stats["errors"] += 1
+                    else:
+                        retry.append((r, text, h))
                     continue
                 share = cost * len(text) / total_chars
                 db.execute(
@@ -147,4 +165,3 @@ def digest_matter(db: sqlite3.Connection, matter_id: int, workers: int = 4) -> d
                      None if d.confidential else d.provider_safe_summary, model, 0, 0, round(share, 6), now_iso()))
                 stats["digested"] += 1
             db.commit()
-    return stats

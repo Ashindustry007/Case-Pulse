@@ -415,20 +415,45 @@ def extract_bills(db: sqlite3.Connection, matter_id: int, ctx: str) -> list[dict
 
 
 class PhotoCheck(BaseModel):
-    is_photo_of_person: bool = Field(description="A real photograph (not a scan/form) showing a person")
-    is_portrait: bool = Field(description="Head-and-shoulders style photo suitable as a profile picture")
+    has_face_photo: bool = Field(description="The image contains a real photograph of a person's face "
+                                              "(e.g. a portrait or the photo on an ID card), not a drawing")
+    face_box: list[float] | None = Field(description="Tight box around that face photo as fractions of the image "
+                                                     "[left, top, right, bottom] in 0..1, or null")
+
+
+def _crop(image_path: str, box: list[float] | None, out: Path) -> bool:
+    import pymupdf
+
+    src = pymupdf.open(image_path)
+    page = src[0]
+    r = page.rect
+    if box and len(box) == 4 and 0 <= box[0] < box[2] <= 1 and 0 <= box[1] < box[3] <= 1:
+        pad = 0.04
+        clip = pymupdf.Rect((box[0] - pad) * r.width, (box[1] - pad) * r.height,
+                            (box[2] + pad) * r.width, (box[3] + pad) * r.height) & r
+    else:
+        clip = r
+    page.get_pixmap(clip=clip, dpi=144).save(out)
+    return True
 
 
 def find_client_photo(db: sqlite3.Connection, matter_id: int) -> dict | None:
-    """Contact avatar if Clio has one; else the first image document that vision confirms is a portrait."""
+    """Contact avatar if Clio has one; else an image document — or a photo-ID style PDF page — in which vision finds
+    a face photo, cropped to the face. Candidates: image files, image-only (OCR'd) first pages, and documents whose
+    title/digest mentions a photo or identification (generic vocabulary, no case-specific names)."""
     client = db.execute("""SELECT c.id, c.avatar_url FROM matter_contacts mc JOIN contacts c ON c.id=mc.contact_id
                            WHERE mc.matter_id=? AND mc.is_client=1""", (matter_id,)).fetchone()
     imgs = db.execute("""SELECT r.id, r.title, r.content_hash, p.image_path FROM records r
                          JOIN document_pages p ON p.document_id = r.id AND p.page_no = 1
-                         WHERE r.matter_id=? AND r.type='document' AND r.deleted_at IS NULL AND
-                           (lower(json_extract(r.meta,'$.content_type')) LIKE 'image/%' OR lower(r.title) GLOB
-                            '*.[jp][pn]*g')""", (matter_id,)).fetchall()
-    h = hashlib.sha256(("|".join(f"{i['id']}:{i['content_hash']}" for i in imgs)
+                         LEFT JOIN digests d ON d.record_id = r.id
+                         WHERE r.matter_id=? AND r.type='document' AND r.deleted_at IS NULL AND (
+                           lower(json_extract(r.meta,'$.content_type')) LIKE 'image/%'
+                           OR p.method IN ('ocr','pending')
+                           OR lower(r.title) GLOB '*photo*' OR lower(r.title) GLOB '*license*'
+                           OR lower(r.title) GLOB '*identification*' OR lower(r.title) GLOB '*[-_ ]id[-_ .]*'
+                           OR lower(COALESCE(d.one_liner,'')) GLOB '*photo*')
+                         ORDER BY (lower(r.title) GLOB '*photo*') DESC LIMIT 6""", (matter_id,)).fetchall()
+    h = hashlib.sha256(("v2|" + "|".join(f"{i['id']}:{i['content_hash']}" for i in imgs)
                         + f"|{client['avatar_url'] if client else ''}").encode()).hexdigest()
     if (cached := _cached(db, matter_id, "client_photo", h)) is not None:
         return cached or None
@@ -444,9 +469,12 @@ def find_client_photo(db: sqlite3.Connection, matter_id: int) -> dict | None:
                                            max_tokens=500, messages=[{"role": "user", "content": [
                                                {"type": "image", "source": {"type": "base64",
                                                                             "media_type": "image/png", "data": data}},
-                                               {"type": "text", "text": "Classify this image."}]}])
-            if parsed.is_photo_of_person and parsed.is_portrait:
-                result = {"source": "document", "document_id": img["id"]}
+                                               {"type": "text", "text": "Does this page contain a photograph of a "
+                                                                        "person's face? If so, locate it."}]}])
+            if parsed.has_face_photo:
+                out = Path(img["image_path"]).with_name("client_photo.png")
+                _crop(img["image_path"], parsed.face_box, out)
+                result = {"source": "document", "document_id": img["id"], "image_path": str(out)}
                 break
     _store(db, matter_id, "client_photo", h, result)
     db.execute("DELETE FROM facts WHERE matter_id=? AND kind='client_photo'", (matter_id,))

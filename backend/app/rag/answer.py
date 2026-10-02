@@ -112,8 +112,13 @@ def _metrics(db: sqlite3.Connection, matter_id: int, kind: str) -> tuple[str, li
         rtype = "expense"
     else:
         rtype = "task"
-    rows = db.execute("SELECT id, meta FROM records WHERE matter_id=? AND type=? AND deleted_at IS NULL",
-                      (matter_id, rtype)).fetchall()
+    if rtype == "expense":
+        from ..ai.views import _firm_expenses
+
+        rows = _firm_expenses(db, matter_id)
+    else:
+        rows = db.execute("SELECT id, meta FROM records WHERE matter_id=? AND type=? AND deleted_at IS NULL",
+                          (matter_id, rtype)).fetchall()
     ids = [r["id"] for r in rows]
     chunk_ids = [c["id"] for c in db.execute(
         f"SELECT id FROM chunks WHERE record_id IN ({','.join('?' * len(ids))}) AND page_no IS NULL", ids)] if ids else []
@@ -131,7 +136,8 @@ def _metrics(db: sqlite3.Connection, matter_id: int, kind: str) -> tuple[str, li
         summary = "; ".join(f"{p}: billed ${b:,.2f}, balance ${bal:,.2f}" for p, (b, bal) in by.items()) or "No bills"
     elif kind == "firm_spend":
         total = sum(m.get("amount") or 0 for m in metas)
-        summary = f"Total firm expenses on this matter ({len(metas)} entries): ${total:,.2f}"
+        summary = (f"Total firm expenses on this matter ({len(metas)} entries): ${total:,.2f} "
+                   "(client medical charges entered as expenses are excluded)")
     else:
         due = sorted((m.get("due_at") or "", m) for m in metas if m.get("status") not in ("complete", "completed"))
         summary = f"{len(due)} open tasks with due dates: " + "; ".join(d for d, _ in due[:10] if d)

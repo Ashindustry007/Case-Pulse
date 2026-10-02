@@ -157,7 +157,8 @@ def document(d: dict) -> Rendered:
 def activity(a: dict) -> tuple[str, Rendered]:
     is_expense = "Expense" in (a.get("type") or "")
     kind = "expense" if is_expense else "time_entry"
-    label = name_of(a.get("expense_category")) or name_of(a.get("activity_description")) or (
+    note_prefix = (strip_html(a.get("note")).split(":", 1)[0].strip() if ":" in (a.get("note") or "") else "")[:60]
+    label = name_of(a.get("expense_category")) or name_of(a.get("activity_description")) or note_prefix or (
         "Expense" if is_expense else "Time entry")
     total = a.get("total") if a.get("total") is not None else (
         (a.get("price") or 0) * (a.get("quantity") or 0) if is_expense else None)

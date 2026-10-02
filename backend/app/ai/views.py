@@ -17,6 +17,17 @@ from ..rag.cite import record_citation
 from . import value
 
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# Client medical charges sometimes get entered as expense entries; they are not money the firm spent.
+NOT_FIRM_SPEND = re.compile(r"medical (treatment|bill|charge|expense)|treatment charge|hospital charge", re.I)
+# Stages at/after filing suit: a past statute-of-limitations date there was met, not missed.
+SUIT_FILED_STAGE = re.compile(r"litigation|suit|trial|settle|disburse|closed|appeal", re.I)
+
+
+def _firm_expenses(db: sqlite3.Connection, matter_id: int) -> list[sqlite3.Row]:
+    rows = db.execute("SELECT * FROM records WHERE matter_id=? AND type='expense' AND deleted_at IS NULL "
+                      "ORDER BY occurred_at", (matter_id,)).fetchall()
+    return [r for r in rows if not NOT_FIRM_SPEND.search(((jload(r["meta"], {}) or {}).get("category") or "")
+                                                         + " " + r["body_text"][:200])]
 
 
 def today() -> str:
@@ -96,7 +107,7 @@ def client_info(db: sqlite3.Connection, m: sqlite3.Row) -> ClientInfo:
     photo_url, photo_cit = None, None
     pf = _fact(db, m["id"], "client_photo")
     if pf and pf[0].get("document_id"):
-        photo_url, photo_cit = f"/api/documents/{pf[0]['document_id']}/file", pf[1][0]
+        photo_url, photo_cit = f"/api/matters/{m['id']}/client-photo", pf[1][0]
     elif c and c["avatar_url"]:
         photo_url = c["avatar_url"]
     dob: Cited[str] | NotFound = NotFound(label="Date of birth")
@@ -117,8 +128,7 @@ def client_info(db: sqlite3.Connection, m: sqlite3.Row) -> ClientInfo:
 
 
 def firm_spend(db: sqlite3.Connection, matter_id: int) -> Cited[float] | NotFound:
-    rows = db.execute("SELECT * FROM records WHERE matter_id=? AND type='expense' AND deleted_at IS NULL "
-                      "ORDER BY occurred_at", (matter_id,)).fetchall()
+    rows = _firm_expenses(db, matter_id)
     total = sum((jload(r["meta"], {}) or {}).get("amount") or 0 for r in rows)
     if not rows:
         return NotFound(label="Firm expenses")
@@ -126,8 +136,7 @@ def firm_spend(db: sqlite3.Connection, matter_id: int) -> Cited[float] | NotFoun
 
 
 def costs(db: sqlite3.Connection, matter_id: int) -> Costs:
-    rows = db.execute("SELECT * FROM records WHERE matter_id=? AND type='expense' AND deleted_at IS NULL",
-                      (matter_id,)).fetchall()
+    rows = _firm_expenses(db, matter_id)
     cats: dict[str, list] = {}
     months: dict[str, float] = {}
     for r in rows:
@@ -160,7 +169,9 @@ def deadlines(db: sqlite3.Connection, matter_id: int) -> Deadlines:
         upcoming.append(DeadlineItem(id=r["id"], title=r["title"], kind="calendar", due_at=r["occurred_at"],
                                      citations=[record_citation(db, r["id"], rec=r)]))
     sol = key_date(db, matter_id, "statute_of_limitations", "Statute of limitations", r"statute|limitation|\bSOL\b")
-    if isinstance(sol, Cited):
+    m = db.execute("SELECT stage_name, status FROM matters WHERE id=?", (matter_id,)).fetchone()
+    suit_filed = bool(m and SUIT_FILED_STAGE.search(f"{m['stage_name'] or ''} {m['status'] or ''}"))
+    if isinstance(sol, Cited) and not (suit_filed and sol.value < now):
         item = DeadlineItem(id="sol", title="Statute of limitations", kind="sol", due_at=sol.value,
                             overdue=sol.value < now, citations=sol.citations)
         (overdue if item.overdue else upcoming).append(item)

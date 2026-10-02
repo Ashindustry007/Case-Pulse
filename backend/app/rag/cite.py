@@ -61,7 +61,8 @@ class ResultRegistry:
         s_blk = min(s_blk, len(units) - 1)
         e_blk = max(s_blk + 1, min(e_blk, len(units)))
         start, end = units[s_blk][0], units[e_blk - 1][1]
-        excerpt = getattr(loc, "cited_text", None) or h.text[start - h.char_start:end - h.char_start]
+        # Excerpt = the exact source slice (Claude's cited_text drops line-break whitespace between blocks).
+        excerpt = h.text[start - h.char_start:end - h.char_start] or getattr(loc, "cited_text", "")
         return _citation(record_id=h.record_id, rtype=h.type, title=h.title, author=h.author, date=h.date,
                          page=h.page, start=start, end=end, excerpt=excerpt, clio_url=h.clio_url)
 
