@@ -1,6 +1,5 @@
 "use client";
-import { ArrowLeft, Eye, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { Eye, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Chips } from "@/components/citations/CitationChip";
@@ -112,8 +111,7 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
-      <Link href={`/matters/${matterId}`} className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Back to matter</Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Share with a provider</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Share with a provider</h1>
       <p className="mt-1 text-[13px] text-muted-foreground">Choose exactly what they see. The preview on the right is the same page they will get.</p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[400px_minmax(0,1fr)]">

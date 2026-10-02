@@ -1,6 +1,6 @@
 "use client";
 import { ArrowUp, MessageSquare, Sparkles, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Chips } from "@/components/citations/CitationChip";
 import { useSourceDrawer } from "@/components/citations/SourceDrawer";
 import { renderTokens } from "@/components/common/RichText";
@@ -21,7 +21,13 @@ const segKey = (turn: number, id: string): string => `${turn}:${id}`;
 
 const SUGGESTED_SHOWN = 3;
 
-export function AskPanel({ matterId, onClose }: { matterId: number; onClose?: () => void }) {
+export function AskPanel({ matterId, onClose, onSources, initialQuestion }: {
+  matterId: number; onClose?: () => void;
+  /** Every citation used so far in the conversation (feeds the Ask page's reference pane). */
+  onSources?: (citations: Citation[]) => void;
+  /** Asked once on mount (e.g. from the overview's quick-ask box). */
+  initialQuestion?: string;
+}) {
   const suggested = useApi<SuggestedQuestions>(`/api/matters/${matterId}/suggested-questions`);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
@@ -30,6 +36,13 @@ export function AskPanel({ matterId, onClose }: { matterId: number; onClose?: ()
   const answersRef = useRef<HTMLDivElement>(null);
   const { open } = useSourceDrawer();
   const busy = turns.some((t) => !t.done);
+  const asked = useRef(false);
+
+  useEffect(() => { onSources?.(turns.flatMap((t) => t.segments.flatMap((s) => s.citations ?? []))); }, [turns, onSources]);
+  useEffect(() => {
+    if (initialQuestion && !asked.current) { asked.current = true; void ask(initialQuestion); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion]);
 
   async function ask(question: string) {
     if (!question.trim() || busy) return;

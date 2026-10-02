@@ -7,7 +7,7 @@ import { isNotFound, type Brief } from "@/lib/types";
 const ROWS = [["carrier", "Carrier"], ["bi_per_person", "BI / person"], ["bi_per_accident", "BI / accident"], ["um_uim", "UM / UIM"], ["medpay", "MedPay"]] as const;
 
 /** "$100,000" → "$100k" for the headline; anything unparsable is shown as written. */
-const short = (v: string) => { const n = Number(v.replace(/[^0-9.]/g, "")); return n >= 1000 && /^\$?\s*[\d,]+(\.\d+)?$/.test(v.trim()) ? fmtMoneyShort(n) : v; };
+export const short = (v: string) => { const n = Number(v.replace(/[^0-9.]/g, "")); return n >= 1000 && /^\$?\s*[\d,]+(\.\d+)?$/.test(v.trim()) ? fmtMoneyShort(n) : v; };
 
 export function CoverageTile({ coverage }: { coverage: Brief["coverage"] }) {
   const person = isNotFound(coverage.bi_per_person) ? null : coverage.bi_per_person.value;

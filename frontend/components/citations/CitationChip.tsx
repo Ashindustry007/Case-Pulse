@@ -7,7 +7,7 @@ import { fmtDate } from "@/lib/format";
 import type { Citation } from "@/lib/types";
 import { useSourceDrawer } from "./SourceDrawer";
 
-const ICON: Record<string, typeof FileText> = {
+export const SOURCE_ICON: Record<string, typeof FileText> = {
   note: StickyNote, communication: Mail, task: SquareCheck, calendar_entry: Calendar, matter_event: Calendar,
   document: FileText, medical_record: FileText, expense: Receipt, time_entry: Receipt, bill: Receipt,
   medical_bill: Receipt, damage: Receipt, custom_field: Tag, contact: User,
@@ -17,7 +17,7 @@ const MAX_VISIBLE = 2;
 export function CitationChip({ citation, siblings }: { citation: Citation; siblings?: Citation[] }) {
   const { open } = useSourceDrawer();
   const list = siblings ?? [citation];
-  const Icon = ICON[citation.source_type] ?? FileText;
+  const Icon = SOURCE_ICON[citation.source_type] ?? FileText;
   return (
     <Popover>
       <PopoverTrigger

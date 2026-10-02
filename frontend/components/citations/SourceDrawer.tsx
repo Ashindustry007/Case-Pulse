@@ -14,6 +14,11 @@ type Ctx = { open: (list: Citation[], index?: number) => void };
 const SourceCtx = createContext<Ctx>({ open: () => {} });
 export const useSourceDrawer = () => useContext(SourceCtx);
 
+/** Route "open source" clicks somewhere other than the drawer (e.g. the Ask page's reference pane). */
+export function SourceTarget({ open, children }: { open: Ctx["open"]; children: React.ReactNode }) {
+  return <SourceCtx.Provider value={{ open }}>{children}</SourceCtx.Provider>;
+}
+
 export function SourceDrawerProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<{ list: Citation[]; i: number } | null>(null);
   const cite = state?.list[state.i];
@@ -37,31 +42,31 @@ export function SourceDrawerProvider({ children }: { children: React.ReactNode }
   );
 }
 
-function SourceView({ citation, pos, total, go }: { citation: Citation; pos: number; total: number; go: (d: number) => void }) {
+export function SourceView({ citation, pos, total, go, inline = false }: { citation: Citation; pos: number; total: number; go: (d: number) => void; inline?: boolean }) {
   const isPage = citation.page != null;
   const id = encodeURIComponent(citation.record_id);
   const record = useApi<SourceRecord>(`/api/records/${id}`);
   const page = useApi<DocumentPage>(isPage ? `/api/documents/${id}/pages/${citation.page}` : null);
   const markRef = useRef<HTMLElement>(null);
   const text = isPage ? page.data?.text : record.data?.body_text;
-  useEffect(() => { markRef.current?.scrollIntoView({ block: "center" }); }, [text]);
+  useEffect(() => { markRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [text]);
   const [before, mark, after] = locateSpan(text ?? "", citation);
   const clioUrl = citation.clio_url ?? record.data?.clio_url;
   const r = record.data;
 
   return (
     <div className="space-y-3">
-      <SheetHeader>
-        <SheetTitle className="flex items-center gap-2 text-base">
-          <FileText className="size-4 shrink-0 text-primary" /> {citation.title}
-          {isPage && ` · page ${citation.page}${page.data ? `/${page.data.page_count}` : ""}`}
-        </SheetTitle>
+      <Header inline={inline}>
+        <Title inline={inline}>
+          <FileText className="size-4 shrink-0 text-primary" /> <span className="min-w-0 [overflow-wrap:anywhere]">{citation.title}</span>
+          {isPage && <span className="shrink-0 text-muted-foreground">· page {citation.page}{page.data ? `/${page.data.page_count}` : ""}</span>}
+        </Title>
         <p className="text-xs text-muted-foreground">
           {citation.source_type.replace(/_/g, " ")}
           {(citation.date ?? r?.occurred_at) && ` · ${fmtDate(citation.date ?? r?.occurred_at)}`}
           {(citation.author ?? r?.author) && ` · by ${citation.author ?? r?.author}`}
         </p>
-      </SheetHeader>
+      </Header>
       <div className="flex items-center gap-2">
         {total > 1 && (
           <>
@@ -78,8 +83,8 @@ function SourceView({ citation, pos, total, go }: { citation: Citation; pos: num
       </div>
       <ErrorNote error={isPage ? page.error : record.error} />
       {text == null ? <Loading lines={8} /> : (
-        <div className={isPage && page.data?.image_url ? "grid grid-cols-2 gap-3" : ""}>
-          {isPage && page.data?.image_url && (
+        <div className={isPage && page.data?.image_url && !inline ? "grid grid-cols-2 gap-3" : "space-y-3"}>
+          {isPage && page.data?.image_url && !inline && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={apiUrl(page.data.image_url)} alt={`Page ${citation.page}`} className="w-full rounded-lg border" />
           )}
@@ -90,4 +95,13 @@ function SourceView({ citation, pos, total, go }: { citation: Citation; pos: num
       )}
     </div>
   );
+}
+
+// Sheet primitives need the dialog context; inline (Ask page) uses plain elements.
+function Header({ inline, children }: { inline: boolean; children: React.ReactNode }) {
+  return inline ? <div className="space-y-1">{children}</div> : <SheetHeader>{children}</SheetHeader>;
+}
+function Title({ inline, children }: { inline: boolean; children: React.ReactNode }) {
+  const cls = "flex items-baseline gap-2 text-base font-semibold";
+  return inline ? <h2 className={cls}>{children}</h2> : <SheetTitle className={cls}>{children}</SheetTitle>;
 }
