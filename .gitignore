@@ -225,3 +225,8 @@ node_modules/
 .next/
 frontend/next-env.d.ts
 .DS_Store
+
+# Local-only working files (not part of the submission)
+graphify-out/
+.claude/skills/
+Context-doc/
