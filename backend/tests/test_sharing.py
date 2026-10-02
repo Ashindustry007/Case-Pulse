@@ -45,5 +45,19 @@ def test_invite_never_converts_an_attorney(api, seeded):
     assert api().post("/api/auth/login", json={"email": EMAILS["attorney"], "password": PASSWORD}).status_code == 200
 
 
+def test_second_invite_for_existing_provider_requires_their_password(api, seeded):
+    code = new_invite(seeded, EMAILS["a"], PROV_B)
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "wrongpassword"}).status_code == 401
+    assert api().post("/api/auth/login", json={"email": EMAILS["a"], "password": PASSWORD}).status_code == 200
+    c = api()
+    r = c.post(f"/api/auth/invite/{code}/accept", json={"password": PASSWORD})
+    assert r.status_code == 200, r.text
+    assert r.json()["provider_contact_id"] == PROV_A
+    with connect(seeded) as db:
+        uid = db.execute("SELECT id FROM users WHERE email = ?", (EMAILS["a"],)).fetchone()["id"]
+        grant = db.execute("SELECT provider_user_id FROM share_grants WHERE email = ?", (EMAILS["a"],)).fetchone()
+        assert grant["provider_user_id"] == uid
+
+
 def test_unknown_invite_404(api):
     assert api().post("/api/auth/invite/nope/accept", json={"password": "longpassword"}).status_code == 404

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from fastapi import HTTPException
 
-from ..auth import create_user
+from ..auth import create_user, verify_password
 from ..config import settings
 from ..db import now_iso
 from . import events
@@ -61,10 +61,15 @@ def accept(db: sqlite3.Connection, code: str, password: str, name: str | None) -
     grant = db.execute("SELECT * FROM share_grants WHERE id = ?", (inv["grant_id"],)).fetchone()
     if grant is None or grant["revoked_at"]:
         raise HTTPException(410, "This share is no longer active.")
-    existing = db.execute("SELECT role FROM users WHERE email = ?", (inv["email"],)).fetchone()
+    existing = db.execute("SELECT id, role, password_hash FROM users WHERE email = ?", (inv["email"],)).fetchone()
     if existing and existing["role"] != "provider":
         raise HTTPException(409, "This email belongs to a firm account.")
-    uid = create_user(db, inv["email"], password, name, "provider", grant["provider_contact_id"])
+    if existing:
+        if not verify_password(existing["password_hash"], password):
+            raise HTTPException(401, "An account already exists for this email. Enter your existing password.")
+        uid = existing["id"]
+    else:
+        uid = create_user(db, inv["email"], password, name, "provider", grant["provider_contact_id"])
     db.execute("UPDATE share_grants SET provider_user_id = ? WHERE id = ?", (uid, grant["id"]))
     db.execute("UPDATE invites SET used_at = ? WHERE code_hash = ?", (now_iso(), inv["code_hash"]))
     user = db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
