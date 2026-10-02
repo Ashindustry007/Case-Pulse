@@ -1,15 +1,14 @@
 "use client";
-import { Sparkles } from "lucide-react";
+import { ArrowLeft, Eye, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Chips } from "@/components/citations/CitationChip";
 import { ErrorNote, Loading } from "@/components/common/states";
 import { ProviderCaseView } from "@/components/provider/ProviderCaseView";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError } from "@/lib/api";
@@ -112,108 +111,121 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
   }
 
   return (
-    <div className="grid grid-cols-[360px_1fr] gap-4 p-4">
-      <div className="space-y-4">
-        <Card><CardContent className="space-y-2 pt-4 text-sm">
-          <Label>Share with</Label>
-          <select className="w-full rounded border bg-background p-2" value={contactId ?? ""} onChange={(e) => setContactId(Number(e.target.value))}>
-            {providers.data?.providers.map((p) => <option key={p.contact_id} value={p.contact_id}>{p.name}</option>)}
-          </select>
-          <Input type="email" placeholder="provider@clinic.com" value={email} disabled={!!grant} onChange={(e) => setEmail(e.target.value)} />
-          <p className="text-xs text-muted-foreground">{grant?.latest_version ? `current: v${grant.latest_version} (${fmtDate(grant.released_at)})` : "not shared yet"}</p>
-        </CardContent></Card>
+    <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
+      <Link href={`/matters/${matterId}`} className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Back to matter</Link>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Share with a provider</h1>
+      <p className="mt-1 text-[13px] text-muted-foreground">Choose exactly what they see. The preview on the right is the same page they will get.</p>
 
-        <Card>
-          <CardHeader className="pb-1"><CardTitle className="text-sm">Fields</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {FIELDS.map(([f, label]) => (
-              <div key={f}>
-                <label className="flex items-center gap-2"><Checkbox checked={t.fields.includes(f)} onCheckedChange={(v) => toggle(f, v === true)} />{label}</label>
-                {f === "coverage" && t.fields.includes("coverage") && (
-                  <RadioGroup className="ml-6 mt-1" value={t.coverage_detail} onValueChange={(v) => setT((s) => ({ ...s, coverage_detail: v as Toggles["coverage_detail"] }))}>
-                    <label className="flex items-center gap-2"><RadioGroupItem value="confirmed" />Confirmed only</label>
-                    <label className="flex items-center gap-2"><RadioGroupItem value="limits" />Carrier + limits</label>
-                  </RadioGroup>
-                )}
-                {f === "documents" && t.fields.includes("documents") && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {candidates.data?.available_documents.map((d) => (
-                      <label key={d.id} className="flex items-center gap-2 text-xs">
-                        <Checkbox checked={t.document_ids.includes(d.id)} onCheckedChange={(v) => setT((s) => ({ ...s, document_ids: v === true ? [...s.document_ids, d.id] : s.document_ids.filter((x) => x !== d.id) }))} />
-                        {d.title}{d.page_count && ` (${d.page_count} pp)`}
-                        {d.category && <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">{d.category}</span>}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {f === "case_details" && t.fields.includes("case_details") && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {(candidates.data?.case_detail_options ?? []).length === 0 && <p className="text-xs text-muted-foreground">No case details in the file.</p>}
-                    {candidates.data?.case_detail_options?.map((o) => (
-                      <label key={o.id} className="flex items-start gap-2 text-xs" title={o.value}>
-                        <Checkbox checked={t.case_fields.includes(o.id)} onCheckedChange={(v) => toggleDetail(o.id, v === true)} />
-                        <span>
-                          <span className="font-medium">{o.label}</span>
-                          <span className="block max-w-[260px] truncate text-muted-foreground">{o.value}</span>
-                          {o.confidential && <span className="text-amber-700">⚠ confidential — not recommended for providers</span>}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[400px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Step n={1} title="Recipient">
+            <select className="h-9 w-full rounded-lg border bg-background px-2.5 text-sm" value={contactId ?? ""} onChange={(e) => setContactId(Number(e.target.value))}>
+              {providers.data?.providers.map((p) => <option key={p.contact_id} value={p.contact_id}>{p.name}</option>)}
+            </select>
+            <Input type="email" placeholder="provider@clinic.com" value={email} disabled={!!grant} onChange={(e) => setEmail(e.target.value)} />
+            <p className="text-xs text-muted-foreground">{grant?.latest_version ? `Current version v${grant.latest_version}, released ${fmtDate(grant.released_at)}` : "Not shared yet"}</p>
+          </Step>
 
-        <Card>
-          <CardHeader className="flex-row items-center pb-1">
-            <CardTitle className="text-sm">Status note</CardTitle>
-            <Button size="sm" variant="outline" className="ml-auto" onClick={draft}><Sparkles className="mr-1 h-3 w-3" />Draft with AI</Button>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <Step n={2} title="What to share">
+            <div className="space-y-2.5 text-[13.5px]">
+              {FIELDS.map(([f, label]) => (
+                <div key={f}>
+                  <label className="flex cursor-pointer items-center gap-2.5"><Checkbox checked={t.fields.includes(f)} onCheckedChange={(v) => toggle(f, v === true)} />{label}</label>
+                  {f === "coverage" && t.fields.includes("coverage") && (
+                    <RadioGroup className="ml-7 mt-1.5" value={t.coverage_detail} onValueChange={(v) => setT((s) => ({ ...s, coverage_detail: v as Toggles["coverage_detail"] }))}>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="confirmed" />Confirmed only</label>
+                      <label className="flex items-center gap-2"><RadioGroupItem value="limits" />Carrier + limits</label>
+                    </RadioGroup>
+                  )}
+                  {f === "documents" && t.fields.includes("documents") && (
+                    <div className="ml-7 mt-1.5 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                      {candidates.data?.available_documents.map((d) => (
+                        <label key={d.id} className="flex cursor-pointer items-start gap-2 text-xs">
+                          <Checkbox checked={t.document_ids.includes(d.id)} onCheckedChange={(v) => setT((s) => ({ ...s, document_ids: v === true ? [...s.document_ids, d.id] : s.document_ids.filter((x) => x !== d.id) }))} />
+                          <span className="min-w-0">{d.title}{d.page_count && ` (${d.page_count} pp)`}{d.category && <span className="ml-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground">{d.category}</span>}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {f === "case_details" && t.fields.includes("case_details") && (
+                    <div className="ml-7 mt-1.5 max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                      {(candidates.data?.case_detail_options ?? []).length === 0 && <p className="text-xs text-muted-foreground">No case details in the file.</p>}
+                      {candidates.data?.case_detail_options?.map((o) => (
+                        <label key={o.id} className="flex cursor-pointer items-start gap-2 text-xs" title={o.value}>
+                          <Checkbox checked={t.case_fields.includes(o.id)} onCheckedChange={(v) => toggleDetail(o.id, v === true)} />
+                          <span className="min-w-0">
+                            <span className="font-medium">{o.label}</span>
+                            <span className="block truncate text-muted-foreground">{o.value}</span>
+                            {o.confidential && <span className="text-warning">Confidential — not recommended for providers</span>}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Step>
+
+          <Step n={3} title="Status note" action={<Button size="sm" variant="outline" onClick={draft}><Sparkles /> Draft with AI</Button>}>
             <Textarea rows={4} value={t.status_note} onChange={(e) => setT((s) => ({ ...s, status_note: e.target.value }))} />
             {openFlags.length === 0
-              ? <p className="text-xs text-emerald-700">✔ 0 confidential flags</p>
-              : <ul className="text-xs text-destructive">{openFlags.map((f, i) => <li key={i}>⚠ “{f.text}” — {f.reason}</li>)}</ul>}
-          </CardContent>
-        </Card>
+              ? <p className="text-xs text-success">No confidential content flagged</p>
+              : <ul className="space-y-1 text-xs text-danger">{openFlags.map((f, i) => <li key={i}>“{f.text}” — {f.reason}</li>)}</ul>}
+          </Step>
 
-        <Card>
-          <CardHeader className="pb-1"><CardTitle className="text-sm">Open requests (attorney view)</CardTitle></CardHeader>
-          <CardContent className="space-y-1 text-xs">
-            {reqs.data?.length === 0 && <p className="text-muted-foreground">None for this provider.</p>}
-            {reqs.data?.map((r) => (
-              <div key={r.id} className="flex items-start gap-2">
-                <span className={r.state !== "open" ? "text-muted-foreground line-through" : ""}>{r.description}<Chips citations={r.citations} /></span>
-                <span className="ml-auto text-muted-foreground">{r.state}</span>
-                {r.state === "open" && <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => dismiss(r.id)}>Dismiss</Button>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+          <Step n={4} title="Open requests (attorney view)">
+            <div className="space-y-2 text-[13px]">
+              {reqs.data?.length === 0 && <p className="text-muted-foreground">None for this provider.</p>}
+              {reqs.data?.map((r) => (
+                <div key={r.id} className="flex items-start gap-2">
+                  <span className={r.state !== "open" ? "text-muted-foreground line-through" : ""}>{r.description}<Chips citations={r.citations} /></span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{r.state}</span>
+                  {r.state === "open" && <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => dismiss(r.id)}>Dismiss</Button>}
+                </div>
+              ))}
+            </div>
+          </Step>
 
-        <div className="flex gap-2">
-          {grant && <Button variant="outline" onClick={revoke}>Revoke</Button>}
-          <Button className="ml-auto" disabled={busy || !contactId || openFlags.length > 0} onClick={release}>Release v{nextVersion} &amp; notify ▸</Button>
+          <div className="sticky bottom-0 -mx-1 flex gap-2 border-t bg-background/90 px-1 py-3 backdrop-blur">
+            {grant && <Button variant="outline" onClick={revoke}>Revoke</Button>}
+            <Button className="ml-auto" disabled={busy || !contactId || openFlags.length > 0} onClick={release}>Release v{nextVersion} &amp; notify</Button>
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          <div className="overflow-hidden rounded-2xl border bg-card">
+            <div className="flex items-center gap-2 border-b px-4 py-2.5 text-[13px]">
+              <Eye className="size-4 text-primary" /> <span className="font-medium">Provider view</span>
+              <span className="text-muted-foreground">· exactly what {provider?.name ?? "the provider"} will see</span>
+              <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">Live preview</span>
+            </div>
+            <div className="max-h-[calc(100vh-14rem)] overflow-y-auto bg-background p-5">
+              <ErrorNote error={candidates.error} />
+              {preview ? <ProviderCaseView c={preview} preview /> : contactId ? <Loading lines={6} /> : <p className="text-muted-foreground">Pick a provider.</p>}
+            </div>
+          </div>
+          {audit.data && (
+            <div className="rounded-xl border bg-card p-4">
+              <p className="section-label mb-3">History &amp; audit</p>
+              <AuditTimeline audit={audit.data} />
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="space-y-4">
-        <Card>
-          <CardHeader className="pb-1"><CardTitle className="text-sm">Preview: exactly what {provider?.name ?? "the provider"} will see</CardTitle></CardHeader>
-          <CardContent className="rounded bg-muted/30 p-4">
-            <ErrorNote error={candidates.error} />
-            {preview ? <ProviderCaseView c={preview} preview /> : contactId ? <Loading lines={6} /> : <p className="text-muted-foreground">Pick a provider.</p>}
-          </CardContent>
-        </Card>
-        {audit.data && (
-          <Card>
-            <CardHeader className="pb-1"><CardTitle className="text-sm">History / audit</CardTitle></CardHeader>
-            <CardContent><AuditTimeline audit={audit.data} /></CardContent>
-          </Card>
-        )}
-      </div>
     </div>
+  );
+}
+
+function Step({ n, title, action, children }: { n: number; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-xl border bg-card p-4">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-5 place-items-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">{n}</span>
+        <h2 className="text-sm font-medium">{title}</h2>
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
+      {children}
+    </section>
   );
 }

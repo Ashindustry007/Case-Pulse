@@ -1,5 +1,5 @@
 "use client";
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, FileText } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ErrorNote, Loading } from "@/components/common/states";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -52,8 +52,8 @@ function SourceView({ citation, pos, total, go }: { citation: Citation; pos: num
   return (
     <div className="space-y-3">
       <SheetHeader>
-        <SheetTitle className="text-base">
-          📄 {citation.title}
+        <SheetTitle className="flex items-center gap-2 text-base">
+          <FileText className="size-4 shrink-0 text-primary" /> {citation.title}
           {isPage && ` · page ${citation.page}${page.data ? `/${page.data.page_count}` : ""}`}
         </SheetTitle>
         <p className="text-xs text-muted-foreground">
@@ -81,9 +81,9 @@ function SourceView({ citation, pos, total, go }: { citation: Citation; pos: num
         <div className={isPage && page.data?.image_url ? "grid grid-cols-2 gap-3" : ""}>
           {isPage && page.data?.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={apiUrl(page.data.image_url)} alt={`Page ${citation.page}`} className="w-full rounded border" />
+            <img src={apiUrl(page.data.image_url)} alt={`Page ${citation.page}`} className="w-full rounded-lg border" />
           )}
-          <pre className="whitespace-pre-wrap rounded border bg-muted/30 p-3 font-sans text-sm leading-relaxed">
+          <pre className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 font-sans text-[13.5px] leading-relaxed">
             {before}<mark ref={markRef} className="cite-span">{mark}</mark>{after}
           </pre>
         </div>

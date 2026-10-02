@@ -17,12 +17,12 @@ export function AiCostTab({ matterId }: { matterId: number }) {
   return (
     <div className="space-y-3 text-sm">
       {r.budget_pct != null && r.budget_pct >= 80 && (
-        <div className="rounded border border-amber-400 bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <div className="rounded-lg bg-warning/10 px-3 py-2 text-warning">
           AI spend is at {r.budget_pct.toFixed(0)}% of this matter&apos;s {usd(r.budget_usd ?? 0)} budget. Nothing is blocked.
         </div>
       )}
       <Card><CardContent className="space-y-2 pt-4">
-        <p className="flex flex-wrap gap-x-6">
+        <p className="flex flex-wrap gap-x-6 gap-y-1">
           <b>Total {usd(r.total_usd)}</b>
           <span>One-time digestion {usd(r.one_time_usd)}</span>
           <span>Ongoing {usd(r.ongoing_usd)} ({r.ask_count} Asks, ≈{usd(r.avg_ask_usd)} ea)</span>
@@ -39,11 +39,11 @@ export function AiCostTab({ matterId }: { matterId: number }) {
         <p>Saved by cache: <b>{usd(r.cache_savings_usd)}</b></p>
       </CardContent></Card>
       <Card><CardContent className="pt-4">
-        <table className="w-full text-xs">
-          <thead className="text-left text-muted-foreground"><tr><th>Time</th><th>User</th><th>Purpose</th><th>Model</th><th>Tokens in / out</th><th className="text-right">$</th></tr></thead>
+        <table className="w-full text-[13px]">
+          <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground"><tr className="[&>th]:pb-2 [&>th]:font-medium"><th>Time</th><th>User</th><th>Purpose</th><th>Model</th><th>Tokens in / out</th><th className="text-right">$</th></tr></thead>
           <tbody>
             {r.runs.map((x, i) => (
-              <tr key={i} className="border-t">
+              <tr key={i} className="border-t [&>td]:py-2">
                 <td>{fmtDateTime(x.at)}</td><td>{x.user ?? "system"}</td><td>{x.purpose}</td><td>{x.model}</td>
                 <td>{tok(x.input_tokens)} / {tok(x.output_tokens)}</td>
                 <td className="text-right font-mono">{x.cache_hit ? "cache hit $0.00" : usd(x.cost_usd)}</td>

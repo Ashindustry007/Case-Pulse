@@ -1,7 +1,7 @@
 "use client";
 import { use, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/common/AuthShell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, ApiError } from "@/lib/api";
@@ -25,20 +25,15 @@ export default function InvitePage({ params }: { params: Promise<{ code: string 
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-muted/40 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader><CardTitle>Set up your Case Pulse access</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-1"><Label htmlFor="name">Your name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div className="space-y-1"><Label htmlFor="pw">Choose a password</Label>
-              <Input id="pw" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full">Continue</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </main>
+    <AuthShell title="Set up your access" subtitle="You were invited to view a case shared by a law firm.">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="space-y-1.5"><Label htmlFor="name">Your name</Label>
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="space-y-1.5"><Label htmlFor="pw">Choose a password</Label>
+          <Input id="pw" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <Button type="submit" size="lg" className="w-full">Continue</Button>
+      </form>
+    </AuthShell>
   );
 }

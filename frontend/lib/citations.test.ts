@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chipLabel, locateSpan, uniqueCitations } from "./citations";
+import { chipKey, chipLabel, chipText, locateSpan, uniqueCitations } from "./citations";
 
 const c = (o: Partial<Parameters<typeof locateSpan>[1]> = {}) => ({
   record_id: "note:12", source_type: "note" as const, title: "t", char_start: 4, char_end: 9, excerpt: "quick", page: null, ...o,
@@ -21,5 +21,17 @@ describe("citations", () => {
   });
   it("dedupes citations", () => {
     expect(uniqueCitations([c(), c(), c({ char_start: 0 })])).toHaveLength(2);
+  });
+  it("renders human chip text, never a raw id", () => {
+    expect(chipText({ source_type: "note", title: "Call", date: "2026-09-09" })).toBe("Note · Sep 9");
+    expect(chipText({ source_type: "document", title: "MRI Report - Lumbar.pdf", date: null, page: 3 })).toBe("MRI Report Lumbar · p3");
+    expect(chipText({ source_type: "document", title: "05-medical-bills__created__acme-ortho-itemized-bill-2024-05-27.pdf", date: null, page: 1 })).toBe("acme ortho itemized… · p1");
+    expect(chipText({ source_type: "medical_record", title: "x", date: null, page: 2 })).toBe("Records p2");
+    expect(chipText({ source_type: "custom_field", title: "Custom field · Policy Limits", date: null })).toBe("Field · Policy Limits");
+    expect(chipText({ source_type: "communication", title: "Re: claim", date: null })).toBe("Email");
+    expect(chipText({ source_type: "note", title: "x", date: "2026-09-09" })).not.toMatch(/\d{5}/);
+  });
+  it("keys chips by record and page", () => {
+    expect(chipKey({ record_id: "document:4", page: 2 })).toBe("document:4|2");
   });
 });

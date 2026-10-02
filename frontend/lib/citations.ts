@@ -1,3 +1,4 @@
+import { parseISODate } from "./format";
 import type { Citation } from "./types";
 
 type CiteLike = Pick<Citation, "record_id" | "source_type" | "char_start" | "char_end" | "excerpt"> & { page?: number | null };
@@ -33,3 +34,37 @@ export function uniqueCitations<T extends CiteLike>(list: T[]): T[] {
     return true;
   });
 }
+
+const TYPE_LABEL: Record<string, string> = {
+  note: "Note", communication: "Email", task: "Task", calendar_entry: "Event", document: "Doc", expense: "Expense",
+  time_entry: "Time", bill: "Bill", medical_record: "Records", medical_bill: "Bill", damage: "Damages",
+  custom_field: "Field", matter_event: "Event", contact: "Contact",
+};
+
+/** Short, human chip text — never a raw record id: "Note · Sep 9", "Doc p3", "Field · Policy Limits". */
+/** "04-medical-records__created__acme-ortho-records-2023.pdf" → "acme ortho records 2023" (readable, cut to `max`). */
+export function shortName(title: string, max = 20): string {
+  const last = title.split("__").pop() ?? title;
+  const words = last.replace(/\.[A-Za-z0-9]{2,4}$/, "").replace(/[-_\s]+/g, " ").replace(/^\d+\s+/, "").trim();
+  return words.length > max ? `${words.slice(0, max - 1).trimEnd()}…` : words;
+}
+
+export function chipText(c: Pick<Citation, "source_type" | "title" | "date"> & { page?: number | null }): string {
+  const base = TYPE_LABEL[c.source_type] ?? "Source";
+  if (c.page != null) {
+    const name = c.source_type === "document" ? shortName(c.title) : "";
+    return name ? `${name} · p${c.page}` : `${base} p${c.page}`;
+  }
+  if (c.source_type === "custom_field") {
+    const name = c.title.split("·").pop()?.trim();
+    return name ? `${base} · ${name}` : base;
+  }
+  if (c.date) {
+    const d = parseISODate(c.date);
+    if (!Number.isNaN(d.getTime())) return `${base} · ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  }
+  return base;
+}
+
+/** What a chip stands for, for de-duplicating the visible chips (full list stays available to the drawer). */
+export const chipKey = (c: Pick<Citation, "record_id"> & { page?: number | null }): string => `${c.record_id}|${c.page ?? ""}`;
