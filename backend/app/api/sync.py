@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..auth import public, require_role
 from ..clio import client as clio
@@ -31,13 +31,16 @@ def clio_login(user=Depends(attorney)):
 @router.get("/auth/clio/callback", dependencies=[Depends(public)], summary="Clio OAuth redirect target")
 def clio_callback(code: str | None = None, state: str | None = None, error: str | None = None):
     if error or not code or not state:
-        return RedirectResponse(f"{settings.frontend_url}/matters?clio=error")
+        return HTMLResponse(f"<h2>Clio authorization failed</h2><p>{error or 'missing code'}</p>", status_code=400)
     try:
         jwt.decode(state, settings.jwt_secret, algorithms=["HS256"])  # CSRF: state must be ours and fresh
     except jwt.PyJWTError:
         raise HTTPException(400, "Invalid OAuth state")
     clio.exchange_code(code)
-    return RedirectResponse(f"{settings.frontend_url}/matters?clio=connected")
+    who = clio.connection_status().get("clio_user") or "your Clio account"
+    return HTMLResponse(f"<html><body style='font-family:system-ui;padding:40px'><h2>✓ Clio connected</h2>"
+                        f"<p>Read-only access granted for {who}. You can close this tab.</p>"
+                        f"<p><a href='{settings.frontend_url}/matters'>Open Case Pulse</a></p></body></html>")
 
 
 @router.post("/api/sync/{matter_id}", dependencies=[Depends(attorney)], response_model=SyncResult)

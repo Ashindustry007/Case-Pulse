@@ -35,7 +35,20 @@ def parse_amount(text: str | None) -> float | None:
     return v * (1000 if suf == "k" else 1_000_000 if suf in ("m", "million") else 1)
 
 
+def _custom_field_amount(db: sqlite3.Connection, matter_id: int, pattern: str) -> tuple[float, list[Citation]]:
+    for r in db.execute("SELECT * FROM records WHERE matter_id=? AND type='custom_field' AND deleted_at IS NULL",
+                        (matter_id,)):
+        meta = jload(r["meta"], {}) or {}
+        if re.search(pattern, meta.get("field_name") or "", re.I):
+            amt = parse_amount(str(meta.get("value")))
+            if amt and (c := record_citation(db, r["id"], rec=r)):
+                return amt, [c]
+    return 0.0, []
+
+
 def medical_specials(db: sqlite3.Connection, matter_id: int) -> tuple[float, list[Citation]]:
+    """Σ structured medical bills (PI add-on) → else Σ bills extracted from billing documents → else a
+    'medical specials' custom field. Every path is cited."""
     total, cits = 0.0, []
     for r in db.execute("""SELECT * FROM records WHERE matter_id=? AND type='medical_bill' AND deleted_at IS NULL
                            ORDER BY occurred_at""", (matter_id,)):
@@ -44,10 +57,19 @@ def medical_specials(db: sqlite3.Connection, matter_id: int) -> tuple[float, lis
             total += float(amt)
             if (c := record_citation(db, r["id"], rec=r)):
                 cits.append(c)
-    return total, cits
+    if cits:
+        return total, cits
+    for v, c in _facts(db, matter_id, "provider_bill"):
+        if v.get("amount"):
+            total += float(v["amount"])
+            cits.extend(c[:1])
+    if cits:
+        return total, cits
+    return _custom_field_amount(db, matter_id, r"medical special|specials|medical bills|medical expenses")
 
 
 def special_damages(db: sqlite3.Connection, matter_id: int) -> tuple[float, list[Citation]]:
+    """Other economic damages: PI add-on 'special' damages, else a wage-loss custom field."""
     total, cits = 0.0, []
     for r in db.execute("""SELECT * FROM records WHERE matter_id=? AND type='damage' AND deleted_at IS NULL""",
                         (matter_id,)):
@@ -56,7 +78,9 @@ def special_damages(db: sqlite3.Connection, matter_id: int) -> tuple[float, list
             total += float(meta["amount"])
             if (c := record_citation(db, r["id"], rec=r)):
                 cits.append(c)
-    return total, cits
+    if cits:
+        return total, cits
+    return _custom_field_amount(db, matter_id, r"wage loss|lost wages|lost earnings|loss of earnings")
 
 
 def _facts(db: sqlite3.Connection, matter_id: int, kind: str) -> list[tuple[dict, list[Citation]]]:
@@ -86,7 +110,8 @@ def worth(db: sqlite3.Connection, matter_id: int) -> WorthEstimate | NotFound:
     band = MODEL["tiers"][tier or MODEL["default_tier_when_unknown"]]
     low = _round(med * band["low"] + dmg)
     high = _round(med * band["high"] + dmg)
-    assumptions = [Assumption(label="Bills total", text=f"{_money(med)} in medical bills ({len(med_cits)} bills)",
+    assumptions = [Assumption(label="Bills total", text=f"{_money(med)} in medical specials ({len(med_cits)} source"
+                                                        f"{'s' if len(med_cits) != 1 else ''})",
                               citations=med_cits)]
     if tier:
         assumptions.append(Assumption(label="Injury severity",
@@ -96,7 +121,7 @@ def worth(db: sqlite3.Connection, matter_id: int) -> WorthEstimate | NotFound:
         assumptions.append(Assumption(label="Injury severity", not_found=True,
                                       text=f"Not found in file — lowest band applied (×{band['low']}–{band['high']})"))
     if dmg > 0:
-        assumptions.append(Assumption(label="Other special damages", text=f"{_money(dmg)} added 1:1",
+        assumptions.append(Assumption(label="Other special damages", text=f"{_money(dmg)} (e.g. wage loss) added 1:1",
                                       citations=dmg_cits))
     cov = coverage(db, matter_id)
     cap_note = None

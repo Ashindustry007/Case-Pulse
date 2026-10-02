@@ -61,9 +61,12 @@ _bucket = _TokenBucket(REQUESTS_PER_MINUTE)
 # ------------------------------------------------------------------------------------------------------------------
 # OAuth (our token only — never case data)
 # ------------------------------------------------------------------------------------------------------------------
-def authorize_url(state: str) -> str:
+APPROVAL_REDIRECT = "https://app.clio.com/oauth/approval"  # Clio-hosted page that displays the code (no local server)
+
+
+def authorize_url(state: str, redirect_uri: str | None = None) -> str:
     q = urlencode({"response_type": "code", "client_id": settings.clio_client_id,
-                   "redirect_uri": settings.clio_redirect_uri, "state": state})
+                   "redirect_uri": redirect_uri or settings.clio_redirect_uri, "state": state})
     return f"{settings.clio_base_url}/oauth/authorize?{q}"
 
 
@@ -85,11 +88,12 @@ def _store_tokens(payload: dict, clio_user: dict | None = None) -> None:
              expires_at, json.dumps(clio_user) if clio_user else None, now_iso()))
 
 
-def exchange_code(code: str) -> None:
+def exchange_code(code: str, redirect_uri: str | None = None) -> None:
     """OAuth step 2: authorization code → access/refresh token (POST to the OAuth host, not the API)."""
     r = httpx.post(f"{settings.clio_base_url}/oauth/token", data={
         "client_id": settings.clio_client_id, "client_secret": settings.clio_client_secret,
-        "grant_type": "authorization_code", "code": code, "redirect_uri": settings.clio_redirect_uri}, timeout=30)
+        "grant_type": "authorization_code", "code": code,
+        "redirect_uri": redirect_uri or settings.clio_redirect_uri}, timeout=30)
     r.raise_for_status()
     _store_tokens(r.json())
     try:
@@ -125,7 +129,6 @@ def connection_status() -> dict[str, Any]:
 # ------------------------------------------------------------------------------------------------------------------
 # API client
 # ------------------------------------------------------------------------------------------------------------------
-_INVALID_FIELD = re.compile(r"(?:invalid|unknown|unpermitted)[^:]*field[s]?[^:]*:\s*([\w{}, .-]+)", re.I)
 
 
 def _drop_field(fields: str, bad: str) -> str:
@@ -195,9 +198,10 @@ class ClioClient:
                 p["fields"] = fields
             r = self.request("GET", path, p)
             if r.status_code == 400 and fields:
-                bad = self._bad_field(r, fields)
-                if bad:
-                    fields = _drop_field(fields, bad)
+                bads = self._bad_fields(r, fields)
+                if bads:
+                    for bad in bads:
+                        fields = _drop_field(fields, bad)
                     continue
             if r.status_code >= 400:
                 raise httpx.HTTPStatusError(f"Clio GET {path} → {r.status_code}: {r.text[:300]}",
@@ -206,19 +210,18 @@ class ClioClient:
         raise RuntimeError(f"Clio GET {path}: too many rejected fields")
 
     @staticmethod
-    def _bad_field(r: httpx.Response, fields: str) -> str | None:
+    def _bad_fields(r: httpx.Response, fields: str) -> list[str]:
+        """Field names Clio rejected, e.g. 'relationships}, custom_field_values} are not valid fields'."""
         try:
-            msg = json.dumps(r.json())
+            msg = (r.json().get("error") or {}).get("message", "")
         except ValueError:
             msg = r.text
-        m = _INVALID_FIELD.search(msg)
+        m = re.search(r"^(.*?)\s+(?:is|are) not (?:a )?valid field", msg)
         if m:
-            return m.group(1).split(",")[0].strip()
-        # Fall back: any top-level field name mentioned in the error message
-        for name in re.findall(r"[a-z_]+", fields):
-            if re.search(rf"\b{name}\b", msg) and name not in {"id", "etag"}:
-                return name
-        return None
+            names = [n.strip(" {}") for n in m.group(1).split(",")]
+            return [n for n in names if n and n not in {"id", "etag"}]
+        known = set(re.findall(r"[a-z_]+", fields)) - {"id", "etag"}
+        return [n for n in known if re.search(rf"\b{n}\b", msg)][:1]
 
     def paginate(self, path: str, *, fields: str | None = None, limit: int = 200, **params: Any) -> Iterator[dict]:
         """Yield every item across pages, following meta.paging.next."""

@@ -22,7 +22,7 @@ class Settings:
     model_fast: str = _get("MODEL_FAST", "claude-haiku-4-5")
     clio_client_id: str = _get("CLIO_CLIENT_ID")
     clio_client_secret: str = _get("CLIO_CLIENT_SECRET")
-    clio_redirect_uri: str = _get("CLIO_REDIRECT_URI", "http://localhost:8000/auth/clio/callback")
+    clio_redirect_uri: str = _get("CLIO_REDIRECT_URI", "http://127.0.0.1:8000/auth/clio/callback")
     clio_base_url: str = _get("CLIO_BASE_URL", "https://app.clio.com").rstrip("/")
     jwt_secret: str = _get("JWT_SECRET", "dev-insecure-secret-change-me-before-any-demo")
     attorney_email: str = _get("ATTORNEY_EMAIL", "attorney@firm.test")

@@ -6,7 +6,8 @@ Results are cached by an input hash over the candidate sources; written to `fact
 brief and by Dev 2's provider projection) and to `briefs(kind='extraction')`.
 
 facts.kind values (contract for readers): injury | coverage | date_of_incident | statute_of_limitations |
-date_of_birth | treatment_visit | client_photo
+date_of_birth | treatment_visit | client_photo | provider_bill
+  provider_bill.value = {"provider_contact_id","provider_name","amount","balance","paid","lien","bill_date"}
   coverage.value = {"field": carrier|bi_per_person|bi_per_accident|um_uim|medpay, "value": "<text>"}
   injury.value   = {"name","body_region","severity_tier","primary","description"}
   treatment_visit.value = {"provider_contact_id","provider_name","date","description","missed": bool}
@@ -356,6 +357,63 @@ def extract_requests(db: sqlite3.Connection, matter_id: int, ctx: str) -> list[d
     return out
 
 
+class BillX(BaseModel):
+    provider_name: str
+    total_billed: float = Field(description="Total charges on this bill/statement, as a number")
+    balance: float | None = Field(description="Balance due if stated, else null")
+    paid: float | None = Field(description="Total payments/adjustments if stated, else null")
+    lien: bool = Field(description="True only if the source states a lien")
+    bill_date: str | None = Field(description="ISO date of the bill/statement if stated")
+    evidence: list[Evidence]
+
+
+class BillsX(BaseModel):
+    bills: list[BillX]
+
+
+def extract_bills(db: sqlite3.Connection, matter_id: int, ctx: str) -> list[dict]:
+    """Medical bills from billing documents (used when the PI add-on's structured bills are not available)."""
+    docs = db.execute("""SELECT r.id FROM records r LEFT JOIN digests d ON d.record_id = r.id
+                         WHERE r.matter_id=? AND r.type='document' AND r.deleted_at IS NULL
+                           AND (d.category='billing_liens' OR lower(r.title) LIKE '%bill%'
+                                OR lower(r.title) LIKE '%invoice%' OR lower(r.title) LIKE '%statement%')""",
+                      (matter_id,)).fetchall()
+    src = Sources()
+    from ..rag.search import hydrate
+    ids = [r["id"] for r in db.execute(
+        f"SELECT id FROM chunks WHERE record_id IN ({','.join('?' * len(docs))}) ORDER BY record_id, page_no, char_start",
+        [d["id"] for d in docs])] if docs else []
+    for h_ in hydrate(db, ids).values():
+        src.add_hit(h_)
+    h = hashlib.sha256(f"{EXTRACT_VERSION}|bills|{src.hash()}".encode()).hexdigest()
+    if (cached := _cached(db, matter_id, "extract_bills", h)) is not None:
+        log_cache_hit("extract", settings.model_main, matter_id=matter_id)
+        return cached["bills"]
+    out: list[dict] = []
+    if src.items:
+        parsed, _ = call_claude_parsed(
+            "extract", settings.model_main, BillsX, matter_id=matter_id, max_tokens=16000,
+            output_config={"effort": "low"},
+            system=f"You extract medical bill totals from itemized bills and statements. {GROUNDING}",
+            messages=[{"role": "user", "content": (
+                f"{ctx}\n\nSources:\n{src.text()}\n\nReturn ONE entry per bill/statement document: the provider, "
+                "the TOTAL billed (not individual line items), balance and payments if stated, lien only if stated, "
+                "and the bill date. Quote the line that shows the total.")}])
+        providers = _providers(db, matter_id)
+        for b in parsed.bills:
+            cits = src.cite(db, b.evidence)
+            if cits:
+                p = match_provider(providers, b.provider_name)
+                out.append({"value": {"provider_contact_id": p["id"] if p else None,
+                                      "provider_name": p["name"] if p else b.provider_name,
+                                      "amount": b.total_billed, "balance": b.balance, "paid": b.paid,
+                                      "lien": b.lien, "bill_date": b.bill_date}, "citations": cits})
+    _store(db, matter_id, "extract_bills", h, {"bills": out})
+    _replace_facts(db, matter_id, ("provider_bill",), [("provider_bill", b["value"], b["citations"]) for b in out], h)
+    db.commit()
+    return out
+
+
 class PhotoCheck(BaseModel):
     is_photo_of_person: bool = Field(description="A real photograph (not a scan/form) showing a person")
     is_portrait: bool = Field(description="Head-and-shoulders style photo suitable as a profile picture")
@@ -402,7 +460,8 @@ def find_client_photo(db: sqlite3.Connection, matter_id: int) -> dict | None:
 def extract_all(db: sqlite3.Connection, matter_id: int) -> dict:
     ctx = context_block(matter_context(db, matter_id))
     out: dict = {}
-    for name, fn in (("medical", extract_medical), ("coverage", extract_coverage), ("requests", extract_requests)):
+    for name, fn in (("medical", extract_medical), ("coverage", extract_coverage), ("bills", extract_bills),
+                     ("requests", extract_requests)):
         try:
             res = fn(db, matter_id, ctx)
             out[name] = len(res) if isinstance(res, (list, dict)) else 0

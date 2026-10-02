@@ -61,8 +61,6 @@ def classify_role(*texts: str | None) -> str:
     t = " ".join(x for x in texts if x).lower()
     if not t:
         return "other"
-    if "client" in t:
-        return "client"
     if any(w in t for w in INSURER_WORDS):
         return "insurer"
     if any(w in t for w in PROVIDER_WORDS):

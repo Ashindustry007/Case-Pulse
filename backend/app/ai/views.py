@@ -228,6 +228,17 @@ def timeline(db: sqlite3.Connection, matter_id: int, types: list[str] | None, si
     return items, len(rows)
 
 
+class _FactCitations(list):
+    """Marks a bill backed by an extracted fact (its citations) rather than a records row."""
+
+
+def _row_cits(db: sqlite3.Connection, r) -> list[Citation]:
+    if isinstance(r, _FactCitations):
+        return list(r)
+    c = record_citation(db, r["id"], rec=r)
+    return [c] if c else []
+
+
 def provider_summaries(db: sqlite3.Connection, matter_id: int) -> list[ProviderSummary]:
     provs = {r["id"]: r for r in db.execute(
         """SELECT c.*, mc.relationship FROM matter_contacts mc JOIN contacts c ON c.id=mc.contact_id
@@ -243,6 +254,16 @@ def provider_summaries(db: sqlite3.Connection, matter_id: int) -> list[ProviderS
                 c = db.execute("SELECT *, NULL AS relationship FROM contacts WHERE id=?", (pid,)).fetchone()
                 if c:
                     provs[pid] = c
+    # Fallback when the PI add-on's structured bills are unavailable: bills extracted (cited) from billing documents.
+    if not bills:
+        for r in db.execute("SELECT value, citations FROM facts WHERE matter_id=? AND kind='provider_bill'", (matter_id,)):
+            v = jload(r["value"], {}) or {}
+            pid = v.get("provider_contact_id")
+            if pid and v.get("amount") is not None:
+                cits = [Citation(**c) for c in jload(r["citations"], [])]
+                bills.setdefault(pid, []).append(({"amount": v["amount"], "balance": v.get("balance"),
+                                                   "lien": v.get("lien"), "bill_date": v.get("bill_date")},
+                                                  _FactCitations(cits)))
     visits: dict[int, list[Visit]] = {}
     for v, cits in [(jload(r["value"], {}), [Citation(**c) for c in jload(r["citations"], [])])
                     for r in db.execute("SELECT value, citations FROM facts WHERE matter_id=? AND kind='treatment_visit'",
@@ -254,13 +275,13 @@ def provider_summaries(db: sqlite3.Connection, matter_id: int) -> list[ProviderS
         for meta, r in items:
             if meta.get("bill_date") and DATE_RE.match(str(meta["bill_date"])):
                 visits.setdefault(pid, []).append(Visit(date=str(meta["bill_date"])[:10], description="Bill date",
-                                                        citations=[record_citation(db, r["id"], rec=r)]))
+                                                        citations=_row_cits(db, r)))
     out = []
     for pid, c in provs.items():
         b = bills.get(pid, [])
         billed = sum(m.get("amount") or 0 for m, _ in b)
         bal_items = [(m, r) for m, r in b if m.get("balance") is not None]
-        cits = [record_citation(db, r["id"], rec=r) for _, r in b]
+        cits = [c for _, r in b for c in _row_cits(db, r)]
         vs = sorted({v.date: v for v in visits.get(pid, [])}.values(), key=lambda v: v.date)
         gaps = [_days_between(a.date, b_.date) for a, b_ in zip(vs, vs[1:])]
         out.append(ProviderSummary(
@@ -268,7 +289,7 @@ def provider_summaries(db: sqlite3.Connection, matter_id: int) -> list[ProviderS
             relationship=c["relationship"] if "relationship" in c.keys() else None,
             billed=Cited[float](value=round(billed, 2), citations=cits) if b else NotFound(label="Billed amount"),
             balance=Cited[float](value=round(sum(m["balance"] for m, _ in bal_items), 2),
-                                 citations=[record_citation(db, r["id"], rec=r) for _, r in bal_items])
+                                 citations=[c for _, r in bal_items for c in _row_cits(db, r)])
             if bal_items else NotFound(label="Balance"),
             lien=any(m.get("lien") for m, _ in b), visits=vs,
             first_visit=vs[0].date if vs else None, last_visit=vs[-1].date if vs else None,

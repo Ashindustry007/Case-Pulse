@@ -25,14 +25,14 @@ log = logging.getLogger("casepulse.sync")
 _sync_lock = threading.Lock()
 
 # ---- Clio field presets (nested selection). Fields this account rejects are pruned automatically by ClioClient. ----
-CFV = "custom_field_values{id,field_name,field_type,value,picklist_option{id,option}}"
+CFV = "custom_field_values{id,field_name,field_type,value,picklist_option}"  # Clio allows ONE level of nesting
 F_MATTER_LIST = "id,display_number,description,status,updated_at,client{id,name}"
 F_MATTER = ("id,etag,number,display_number,description,status,open_date,close_date,pending_date,created_at,updated_at,"
             "client{id,name,type},practice_area{id,name},matter_stage{id,name},responsible_attorney{id,name,email},"
-            f"originating_attorney{{id,name}},relationships{{id,description,contact{{id,name,type}}}},{CFV}")
+            f"originating_attorney{{id,name}},relationships{{id,description,contact}},{CFV}")
 F_CONTACT = ("id,etag,name,first_name,last_name,type,title,date_of_birth,created_at,updated_at,primary_email_address,"
              "primary_phone_number,email_addresses{address,name,primary},phone_numbers{number,name,primary},"
-             f"avatar,company{{id,name}},{CFV}")
+             "avatar,company{id,name},custom_field_values{id,field_name,field_type,value}")
 F_RELATED = "id,name,type,is_matter_client,relationship{id,description},primary_email_address,primary_phone_number"
 F_NOTE = "id,etag,subject,detail,date,created_at,updated_at,type,author{id,name},matter{id}"
 F_COMM = ("id,etag,subject,body,type,date,received_at,created_at,updated_at,senders{id,name,type},"
@@ -47,10 +47,10 @@ F_ACT = ("id,etag,type,date,quantity,price,total,note,created_at,updated_at,user
          "activity_description{id,name},expense_category{id,name},matter{id},reference")
 F_BILL = "id,etag,number,issued_at,due_at,total,balance,state,created_at,updated_at,subject"
 F_MED_BILL = ("id,etag,name,amount,bill_date,bill_received_date,adjustment,balance,mark_balance_as_lien,created_at,"
-              "updated_at,payers{amount,mark_as_lien,holder{id,name}}")
-F_MRD = ("id,etag,description,treatment_start_date,treatment_end_date,in_treatment,record_status,bill_status,"
-         "record_request_date,bill_request_date,created_at,updated_at,medical_provider{id,name},"
-         f"medical_bills{{{F_MED_BILL}}}")
+              "updated_at,payers")
+F_MRD = ("id,etag,description,treatment_start_date,treatment_end_date,in_treatment,created_at,updated_at,"
+         "medical_provider{id,name},medical_bills{id,name,amount,bill_date,bill_received_date,adjustment,balance,"
+         "mark_balance_as_lien}")
 F_DAMAGE = "id,etag,amount,damage_type,description,created_at,updated_at"
 F_STAGE = "id,name,practice_area{id,name}"
 F_USER = "id,name,email"
