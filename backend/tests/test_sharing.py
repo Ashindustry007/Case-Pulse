@@ -265,3 +265,54 @@ def test_malformed_occurred_at_is_ignored(seeded):
     hb = _case(seeded, ["status"])["heartbeat"]
     assert hb["state"] == "active"
     assert hb["last_movement"] == {"date": days_ago(3), "text": "Case activity recorded"}
+
+
+# ----------------------------------------------------------------------------------- provider flow (2.6c, F6–F8)
+
+
+def test_release_view_open_events_in_order(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["status", "documents"], docs=["document:10"])
+    a = api("a")
+    case = a.get(f"/api/provider/cases/{gid}")
+    assert case.status_code == 200 and "coverage" not in case.json() and "bills" not in case.json()
+    doc = a.get(f"/api/provider/cases/{gid}/documents/document:10")
+    assert doc.status_code == 200 and doc.content.startswith(b"%PDF")
+    events = att.get(f"/api/shares/{gid}/audit").json()["events"]
+    assert [e["event"] for e in events] == ["released", "viewed", "document_opened"]
+    assert events[1]["actor_email"] == EMAILS["a"] and events[2]["meta"]["document_id"] == "document:10"
+
+
+def test_provider_reload_reflects_new_version(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["status"])
+    a = api("a")
+    assert a.get(f"/api/provider/cases/{gid}").json()["policy_version"] == 1
+    share(att, fields=["status", "bills"])
+    v2 = a.get(f"/api/provider/cases/{gid}").json()
+    assert v2["policy_version"] == 2 and v2["bills"]["billed"] == 1200.0
+
+
+def test_mark_sent_persists_and_logs(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["open_requests"])
+    a = api("a")
+    assert a.post("/api/provider/requests/req:1/complete").status_code == 200
+    reqs = {r["id"]: r for r in a.get(f"/api/provider/cases/{gid}").json()["requests"]}
+    assert reqs["req:1"]["state"] == "completed"
+    events = [e["event"] for e in att.get(f"/api/shares/{gid}/audit").json()["events"]]
+    assert events[-2:] == ["request_completed", "viewed"]
+
+
+def test_mark_sent_requires_open_requests_shared(api, seeded):
+    att = api("attorney")
+    share(att, fields=["status"])
+    assert api("a").post("/api/provider/requests/req:1/complete").status_code == 404
+
+
+def test_case_list_respects_whitelist(api, seeded):
+    att = api("attorney")
+    share(att, fields=["documents"])          # no status, no open_requests
+    [summary] = api("a").get("/api/provider/cases").json()
+    assert summary["patient_display"] == "P. E."
+    assert summary.get("state") is None and summary["open_requests"] == 0
