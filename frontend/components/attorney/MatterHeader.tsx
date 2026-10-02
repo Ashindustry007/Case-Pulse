@@ -43,9 +43,14 @@ export function MatterHeader({ overview: o }: { overview: Overview }) {
           </p>
         </div>
       </div>
-      <div className="ml-auto rounded-xl border bg-card px-4 py-3">
-        <p className="section-label mb-1.5">Current stage</p>
-        <StageStepper stages={o.stage.stages ?? []} index={o.stage.index ?? null} current={o.stage.current ?? null} />
+      <div className="w-full rounded-xl border bg-card px-4 pb-3 pt-3.5">
+        <div className="mb-3 flex items-baseline gap-2">
+          <p className="section-label">Case stage</p>
+          {o.stage.index != null && <span className="text-xs text-muted-foreground">{o.stage.current} · {o.stage.index + 1} of {o.stage.stages?.length}</span>}
+        </div>
+        <div className="overflow-x-auto"><div className="min-w-[560px]">
+          <StageStepper stages={o.stage.stages ?? []} index={o.stage.index ?? null} current={o.stage.current ?? null} />
+        </div></div>
       </div>
     </section>
   );

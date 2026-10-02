@@ -1,21 +1,29 @@
-/** Case stage as a compact dot stepper: done = filled gold, current = ringed gold + label, future = dim. */
+import { Check } from "lucide-react";
+
+/** Case stage as a labelled stepper: done = gold check, current = ringed gold, future = dim. Every stage is named. */
 export function StageStepper({ stages, index, current }: { stages: string[]; index: number | null; current: string | null }) {
   if (!stages.length) return current ? <span className="text-sm">{current}</span> : null;
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <ol className="flex items-center gap-1" aria-label="Case stage">
-        {stages.map((s, i) => {
-          const done = index != null && i < index;
-          const now = index === i;
-          return (
-            <li key={s} title={s} className="flex items-center gap-1">
-              <span className={`block rounded-full transition-colors ${now ? "size-3 bg-primary ring-4 ring-primary/20" : done ? "size-2 bg-primary/70" : "size-2 bg-muted-foreground/30"}`} />
-              {i < stages.length - 1 && <span className={`block h-px w-4 ${done ? "bg-primary/50" : "bg-border"}`} />}
-            </li>
-          );
-        })}
-      </ol>
-      <p className="text-xs"><span className="font-medium">{current ?? "—"}</span>{index != null && <span className="text-muted-foreground"> · stage {index + 1} of {stages.length}</span>}</p>
-    </div>
+    <ol className="grid w-full" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }} aria-label="Case stage">
+      {stages.map((s, i) => {
+        const done = index != null && i < index;
+        const now = index === i;
+        return (
+          <li key={s} className="relative flex flex-col items-center gap-2 px-1 text-center" aria-current={now ? "step" : undefined}>
+            {i < stages.length - 1 && (
+              <span className={`absolute left-1/2 top-[11px] h-0.5 w-full ${done ? "bg-primary/60" : "bg-border"}`} aria-hidden />
+            )}
+            <span
+              className={`relative z-10 grid size-6 place-items-center rounded-full text-[11px] font-semibold ${
+                now ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : done ? "bg-primary/20 text-primary" : "border bg-card text-muted-foreground"
+              }`}
+            >
+              {done ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+            </span>
+            <span className={`text-[11.5px] leading-tight ${now ? "font-semibold text-primary" : done ? "text-foreground" : "text-muted-foreground"}`}>{s}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
