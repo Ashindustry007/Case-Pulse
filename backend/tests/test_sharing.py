@@ -1,0 +1,318 @@
+"""[Dev 2] Sharing: invites, release/versioning, projection, events, request states (F5–F8)."""
+from backend.app.db import connect
+from backend.tests.dev2_support import (EMAILS, MATTER, PASSWORD, PROV_A, PROV_B, api, db_path,  # noqa: F401
+                                        days_ago, new_invite, seeded, share)
+
+# ---------------------------------------------------------------------------------------------------- invites (2.2)
+
+
+def test_invite_accept_creates_provider_and_logs_in(api, seeded):
+    code = new_invite(seeded, "new-provider@clinic.test")
+    c = api()
+    r = c.post(f"/api/auth/invite/{code}/accept", json={"password": "longpassword", "name": "New Provider"})
+    assert r.status_code == 200, r.text
+    assert r.json()["role"] == "provider" and r.json()["provider_contact_id"] == PROV_A
+    assert c.get("/api/auth/me").json()["email"] == "new-provider@clinic.test"
+    with connect(seeded) as db:
+        grant = db.execute("SELECT provider_user_id FROM share_grants WHERE email = ?",
+                           ("new-provider@clinic.test",)).fetchone()
+        assert grant["provider_user_id"] == r.json()["id"]
+        assert db.execute("SELECT event FROM share_events").fetchone()["event"] == "invite_accepted"
+
+
+def test_invite_cannot_be_reused(api, seeded):
+    code = new_invite(seeded, "once@clinic.test")
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "longpassword"}).status_code == 200
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "otherpassword"}).status_code == 410
+
+
+def test_expired_invite_rejected(api, seeded):
+    code = new_invite(seeded, "late@clinic.test")
+    with connect(seeded) as db:
+        db.execute("UPDATE invites SET expires_at = '2000-01-01T00:00:00Z'")
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "longpassword"}).status_code == 410
+
+
+def test_invite_for_revoked_grant_rejected(api, seeded):
+    code = new_invite(seeded, "gone@clinic.test", revoked=True)
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "longpassword"}).status_code == 410
+
+
+def test_invite_never_converts_an_attorney(api, seeded):
+    code = new_invite(seeded, EMAILS["attorney"])
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "hijackpassword"}).status_code == 409
+    # attorney password unchanged
+    assert api().post("/api/auth/login", json={"email": EMAILS["attorney"], "password": PASSWORD}).status_code == 200
+
+
+def test_second_invite_for_existing_provider_requires_their_password(api, seeded):
+    code = new_invite(seeded, EMAILS["a"], PROV_B)
+    assert api().post(f"/api/auth/invite/{code}/accept", json={"password": "wrongpassword"}).status_code == 401
+    assert api().post("/api/auth/login", json={"email": EMAILS["a"], "password": PASSWORD}).status_code == 200
+    c = api()
+    r = c.post(f"/api/auth/invite/{code}/accept", json={"password": PASSWORD})
+    assert r.status_code == 200, r.text
+    assert r.json()["provider_contact_id"] == PROV_A
+    with connect(seeded) as db:
+        uid = db.execute("SELECT id FROM users WHERE email = ?", (EMAILS["a"],)).fetchone()["id"]
+        grant = db.execute("SELECT provider_user_id FROM share_grants WHERE email = ?", (EMAILS["a"],)).fetchone()
+        assert grant["provider_user_id"] == uid
+
+
+def test_unknown_invite_404(api):
+    assert api().post("/api/auth/invite/nope/accept", json={"password": "longpassword"}).status_code == 404
+
+
+# ------------------------------------------------------------------------------------------- projection (2.6a, F6)
+from datetime import date  # noqa: E402
+
+from backend.app.contracts import SharePolicy  # noqa: E402
+from backend.app.sharing import projection, sources  # noqa: E402
+
+
+def _policy(fields, docs=(), detail="confirmed", note=None):
+    return SharePolicy(grant_id=1, version=1, fields=list(fields), document_ids=list(docs), coverage_detail=detail,
+                       status_note=note, released_at="2026-10-01T00:00:00Z")
+
+
+def _case(db_path, fields, contact=PROV_A, **kw):
+    with connect(db_path) as db:
+        s = projection.build_sections(db, MATTER, contact)
+    return projection.project(s, grant_id=1, policy=_policy(fields, **kw), shared_by="Firm Attorney").model_dump(
+        mode="json", exclude_none=True)
+
+
+def test_heartbeat_state_boundaries():
+    today = date(2026, 10, 2)
+    assert projection.heartbeat_state("open", "2026-09-02", today) == "active"     # 30d
+    assert projection.heartbeat_state("open", "2026-09-01", today) == "quiet"      # 31d
+    assert projection.heartbeat_state("open", "2026-07-04", today) == "quiet"      # 90d
+    assert projection.heartbeat_state("open", "2026-07-03", today) == "dormant"    # 91d
+    assert projection.heartbeat_state("Closed", "2026-10-01", today) == "closed"
+    assert projection.heartbeat_state("open", None, today) == "dormant"
+
+
+def test_only_granted_sections_exist(seeded):
+    case = _case(seeded, ["status"])
+    assert set(case) == {"grant_id", "policy_version", "patient_display", "firm_name", "shared_by", "updated_at",
+                         "heartbeat"}
+    assert case["patient_display"] == "P. E."
+
+
+def test_every_field_maps_to_its_section(seeded):
+    case = _case(seeded, projection.ALL_FIELDS, docs=["document:10"], detail="limits", note="Hello")
+    for key in ("heartbeat", "coverage", "case_value", "bills", "requests", "documents", "adherence", "other_care",
+                "status_note"):
+        assert key in case, key
+
+
+def test_last_movement_masks_confidential_activity(seeded):
+    hb = _case(seeded, ["status"])["heartbeat"]
+    assert hb["state"] == "active"
+    assert hb["last_movement"] == {"date": days_ago(3), "text": "Case activity recorded"}
+    assert [m["text"] for m in hb["recent_movement"]] == ["ER records received"]
+    assert hb["stage"]["current"] == "Demand" and hb["stage"]["index"] == 2
+
+
+def test_coverage_detail_variants(seeded):
+    assert _case(seeded, ["coverage"])["coverage"] == {"confirmed": True}
+    limits = _case(seeded, ["coverage"], detail="limits")["coverage"]
+    assert limits["carrier"] == "Acme Mutual" and "BI per person $100,000" in limits["limits_text"]
+    assert "UM/UIM" not in limits["limits_text"]          # not found → never invented
+
+
+def test_sections_are_scoped_to_the_provider(seeded):
+    a = _case(seeded, ["bills", "open_requests", "adherence", "other_care"])
+    assert a["bills"]["billed"] == 1200.0 and a["bills"]["lien"] is True
+    assert {r["id"] for r in a["requests"]} == {"req:1", "req:2"}
+    assert len(a["adherence"]["visits"]) == 2 and a["adherence"]["gaps"][0]["days"] == 60
+    assert [o["provider_name"] for o in a["other_care"]] == ["Provider B Clinic"]
+    b = _case(seeded, ["bills", "open_requests"], contact=PROV_B)
+    assert b["bills"]["billed"] == 500.0 and "balance" not in b["bills"]
+    assert {r["id"] for r in b["requests"]} == {"req:3"}
+
+
+def test_provider_sees_excerpt_only_when_addressed_to_them(seeded):
+    reqs = {r["id"]: r for r in _case(seeded, ["open_requests"])["requests"]}
+    assert reqs["req:1"]["citations"] == []
+    assert reqs["req:2"]["citations"][0]["excerpt"] == "Please send an itemized bill"
+    with connect(seeded) as db:
+        full = projection.requests.requests_for(db, MATTER, PROV_A, audience="attorney")
+    assert all(r.citations for r in full)
+
+
+def test_documents_limited_to_policy(seeded):
+    assert [d["id"] for d in _case(seeded, ["documents"], docs=["document:10"])["documents"]] == ["document:10"]
+    assert _case(seeded, ["documents"])["documents"] == []
+
+
+def test_empty_dev1_data_still_projects(db_path):
+    from backend.tests.dev2_support import seed
+    with connect(db_path) as db:
+        seed(db, with_case_data=False)
+    case = _case(db_path, projection.ALL_FIELDS)
+    assert case["heartbeat"]["state"] == "dormant"
+    for key in ("coverage", "case_value", "bills", "adherence", "other_care"):
+        assert key not in case, key
+    assert case["requests"] == [] and case["documents"] == []
+
+
+def test_malformed_fact_is_ignored_not_fatal(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, created_at) "
+                   "VALUES (?, 'coverage', '{\"carrier\": 1}', '[]', 'x', '2999-01-01T00:00:00Z')", (MATTER,))
+        assert sources.coverage(db, MATTER) is None
+    assert "coverage" not in _case(seeded, ["coverage"])
+
+
+# ------------------------------------------------------------------------------ grants / release / audit (2.6b)
+
+
+def test_release_versions_and_logs(api, seeded):
+    att = api("attorney")
+    gid, r1 = share(att, fields=["status"])
+    assert r1["policy"]["version"] == 1 and r1["invite_url"] is None        # provider A already has an account
+    _, r2 = share(att, fields=["status", "coverage"])                        # same grant reused
+    assert r2["policy"]["version"] == 2
+    audit = att.get(f"/api/shares/{gid}/audit").json()
+    assert [v["policy"]["version"] for v in audit["versions"]] == [1, 2]
+    assert audit["versions"][1]["added"] == ["coverage", "coverage:confirmed"] and audit["versions"][1]["removed"] == []
+    assert [e["event"] for e in audit["events"]] == ["released", "released"]
+    assert audit["grant"]["latest_version"] == 2 and audit["grant"]["provider_user_id"] is not None
+
+
+def test_release_to_new_email_creates_invite(api, seeded, capsys):
+    att = api("attorney")
+    gid, r = share(att, contact=PROV_B, email="new@clinic.test")
+    assert r["invite_url"] and "/invite/" in r["invite_url"]
+    assert r["invite_url"] in capsys.readouterr().out                       # console fallback
+    events = [e["event"] for e in att.get(f"/api/shares/{gid}/audit").json()["events"]]
+    assert events == ["released", "invite_sent"]
+
+
+def test_release_rejects_foreign_documents_and_revoked_grants(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att)
+    bad = att.post(f"/api/shares/{gid}/release", json={"fields": ["documents"], "document_ids": ["document:999"]})
+    assert bad.status_code == 400
+    assert att.post(f"/api/shares/{gid}/revoke").status_code == 200
+    again = att.post(f"/api/shares/{gid}/release", json={"fields": ["status"]})
+    assert again.status_code == 409
+    assert att.get(f"/api/shares/{gid}/audit").json()["events"][-1]["event"] == "revoked"
+
+
+def test_candidates_include_everything_scoped(api, seeded):
+    att = api("attorney")
+    c = att.get(f"/api/matters/{MATTER}/share-candidates?provider_contact_id={PROV_A}").json()
+    assert c["provider"]["name"] == "Provider A Clinic"
+    assert set(c["coverage_variants"]) == {"confirmed", "limits"}
+    assert {d["id"] for d in c["available_documents"]} == {"document:10", "document:11"}
+    assert c["case"]["bills"]["billed"] == 1200.0 and "heartbeat" in c["case"]
+
+
+def test_candidates_for_unknown_provider_404(api, seeded):
+    assert api("attorney").get(f"/api/matters/{MATTER}/share-candidates?provider_contact_id=999").status_code == 404
+
+
+def test_attorney_request_view_and_dismiss(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["open_requests"])
+    reqs = att.get(f"/api/matters/{MATTER}/requests?provider_contact_id={PROV_A}").json()
+    assert all(r["citations"] for r in reqs)                                  # attorney always sees sources
+    assert att.post("/api/requests/req:1/dismiss").status_code == 200
+    states = {r["id"]: r["state"] for r in att.get(f"/api/matters/{MATTER}/requests?provider_contact_id={PROV_A}").json()}
+    assert states["req:1"] == "dismissed"
+    assert att.get(f"/api/shares/{gid}/audit").json()["events"][-1]["event"] == "request_dismissed"
+    assert att.post("/api/requests/req:nope/dismiss").status_code == 404
+
+
+def test_list_grants(api, seeded):
+    att = api("attorney")
+    share(att)
+    grants = att.get(f"/api/matters/{MATTER}/shares").json()
+    assert len(grants) == 1 and grants[0]["provider_name"] == "Provider A Clinic"
+
+
+def test_malformed_visit_date_omits_only_adherence(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, created_at) VALUES "
+                   "(?, 'treatment_visit', ?, '[]', 'x', '2026-01-01T00:00:00Z')",
+                   (MATTER, '{"provider_contact_id": %d, "provider_name": "Provider A Clinic", '
+                            '"date": "not-a-date"}' % PROV_A))
+        db.execute("INSERT INTO facts(matter_id, kind, value, citations, input_hash, created_at) VALUES "
+                   "(?, 'treatment_visit', ?, '[]', 'y', '2026-01-01T00:00:00Z')",
+                   (MATTER, '{"provider_contact_id": %d, "date": 12345}' % PROV_A))
+    case = _case(seeded, ["status", "adherence", "bills"])
+    assert "heartbeat" in case and "bills" in case
+    assert len(case["adherence"]["visits"]) == 2
+
+
+def test_malformed_bill_amount_omits_only_bills(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO records(id, matter_id, type, title, body_text, occurred_at, meta, content_hash, "
+                   "first_seen_at, last_changed_at) VALUES ('medical_bill:99', ?, 'medical_bill', 'Bad', 'Bad', ?, ?, "
+                   "'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                   (MATTER, days_ago(1), '{"provider_contact_id": %d, "amount": "abc"}' % PROV_A))
+    case = _case(seeded, ["status", "bills"])
+    assert "bills" not in case and "heartbeat" in case
+
+
+def test_malformed_occurred_at_is_ignored(seeded):
+    with connect(seeded) as db:
+        db.execute("INSERT INTO records(id, matter_id, type, title, body_text, occurred_at, meta, content_hash, "
+                   "first_seen_at, last_changed_at) VALUES ('note:98', ?, 'note', 'Odd', 'Odd', 'garbage', '{}', "
+                   "'h', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')", (MATTER,))
+    hb = _case(seeded, ["status"])["heartbeat"]
+    assert hb["state"] == "active"
+    assert hb["last_movement"] == {"date": days_ago(3), "text": "Case activity recorded"}
+
+
+# ----------------------------------------------------------------------------------- provider flow (2.6c, F6–F8)
+
+
+def test_release_view_open_events_in_order(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["status", "documents"], docs=["document:10"])
+    a = api("a")
+    case = a.get(f"/api/provider/cases/{gid}")
+    assert case.status_code == 200 and "coverage" not in case.json() and "bills" not in case.json()
+    doc = a.get(f"/api/provider/cases/{gid}/documents/document:10")
+    assert doc.status_code == 200 and doc.content.startswith(b"%PDF")
+    events = att.get(f"/api/shares/{gid}/audit").json()["events"]
+    assert [e["event"] for e in events] == ["released", "viewed", "document_opened"]
+    assert events[1]["actor_email"] == EMAILS["a"] and events[2]["meta"]["document_id"] == "document:10"
+
+
+def test_provider_reload_reflects_new_version(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["status"])
+    a = api("a")
+    assert a.get(f"/api/provider/cases/{gid}").json()["policy_version"] == 1
+    share(att, fields=["status", "bills"])
+    v2 = a.get(f"/api/provider/cases/{gid}").json()
+    assert v2["policy_version"] == 2 and v2["bills"]["billed"] == 1200.0
+
+
+def test_mark_sent_persists_and_logs(api, seeded):
+    att = api("attorney")
+    gid, _ = share(att, fields=["open_requests"])
+    a = api("a")
+    assert a.post("/api/provider/requests/req:1/complete").status_code == 200
+    reqs = {r["id"]: r for r in a.get(f"/api/provider/cases/{gid}").json()["requests"]}
+    assert reqs["req:1"]["state"] == "completed"
+    events = [e["event"] for e in att.get(f"/api/shares/{gid}/audit").json()["events"]]
+    assert events[-2:] == ["request_completed", "viewed"]
+
+
+def test_mark_sent_requires_open_requests_shared(api, seeded):
+    att = api("attorney")
+    share(att, fields=["status"])
+    assert api("a").post("/api/provider/requests/req:1/complete").status_code == 404
+
+
+def test_case_list_respects_whitelist(api, seeded):
+    att = api("attorney")
+    share(att, fields=["documents"])          # no status, no open_requests
+    [summary] = api("a").get("/api/provider/cases").json()
+    assert summary["patient_display"] == "P. E."
+    assert summary.get("state") is None and summary["open_requests"] == 0
