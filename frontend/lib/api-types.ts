@@ -378,6 +378,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/matters/{matter_id}/client-photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cropped client photo (from Clio avatar or a photo/ID document) */
+        get: operations["client_photo_api_matters__matter_id__client_photo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/provider/cases": {
         parameters: {
             query?: never;
@@ -657,7 +674,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Clio Login */
+        /** Redirect the attorney to Clio to authorize read access */
         get: operations["clio_login_auth_clio_login_get"];
         put?: never;
         post?: never;
@@ -674,7 +691,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Clio Callback */
+        /** Clio OAuth redirect target */
         get: operations["clio_callback_auth_clio_callback_get"];
         put?: never;
         post?: never;
@@ -693,8 +710,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sync Matter */
-        post: operations["sync_matter_api_sync__matter_id__post"];
+        /** Run Sync */
+        post: operations["run_sync_api_sync__matter_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2450,7 +2467,9 @@ export interface operations {
     };
     digest_runs_api_matters__matter_id__digest_runs_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path: {
                 matter_id: number;
@@ -2646,6 +2665,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Providers"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    client_photo_api_matters__matter_id__client_photo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -3172,7 +3222,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkResponse"];
+                    "application/json": unknown;
                 };
             };
         };
@@ -3182,6 +3232,7 @@ export interface operations {
             query?: {
                 code?: string | null;
                 state?: string | null;
+                error?: string | null;
             };
             header?: never;
             path?: never;
@@ -3195,7 +3246,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OkResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -3209,9 +3260,11 @@ export interface operations {
             };
         };
     };
-    sync_matter_api_sync__matter_id__post: {
+    run_sync_api_sync__matter_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                full?: boolean;
+            };
             header?: never;
             path: {
                 matter_id: number;

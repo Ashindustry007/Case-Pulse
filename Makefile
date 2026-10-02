@@ -1,5 +1,5 @@
 # Case Pulse — common commands. Backend: uv + Python 3.12. Frontend: Next.js (frontend/).
-.PHONY: clio-connect clio-code setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test fixtures
+.PHONY: clio-connect clio-code setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test
 
 PY := uv run python
 
@@ -42,6 +42,3 @@ types:            ## regenerate frontend API types from the running backend's Op
 
 test:             ## unit tests
 	uv run pytest -q
-
-fixtures:         ## (Phase 0 only) regenerate stub fixtures
-	$(PY) scripts/gen_fixtures.py
