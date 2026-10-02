@@ -33,10 +33,11 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
   const [contactId, setContactId] = useState<number | null>(initialProvider ?? null);
   const provider = providers.data?.providers.find((p) => p.contact_id === contactId);
   const grant = grants.data?.find((g) => g.provider_contact_id === contactId && !g.revoked_at);
+  const auditGrant = grants.data?.filter((g) => g.provider_contact_id === contactId).reduce<Grant | undefined>((a, g) => (!a || g.id > a.id ? g : a), undefined);   // latest, even if revoked
   const q = contactId ? `provider_contact_id=${contactId}` : null;
   const candidates = useApi<ShareCandidates>(q && `/api/matters/${matterId}/share-candidates?${q}`);
   const reqs = useApi<ProviderRequest[]>(q && `/api/matters/${matterId}/requests?${q}`);
-  const audit = useApi<ShareAudit>(grant ? `/api/shares/${grant.id}/audit` : null);
+  const audit = useApi<ShareAudit>(auditGrant ? `/api/shares/${auditGrant.id}/audit` : null);
   const [email, setEmail] = useState("");
   const [t, setT] = useState<Toggles>(DEFAULT);
   const [flags, setFlags] = useState<DraftFlag[]>([]);
@@ -87,7 +88,7 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
     try {
       await api(`/api/shares/${grant.id}/revoke`, { method: "POST" });
       toast.success("Access revoked");
-      grants.reload();
+      grants.reload(); audit.reload();
     } catch (e) { toastError(e); }
   }
 
