@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { use } from "react";
+import { AiCostTab } from "@/components/attorney/AiCostTab";
 import { AskPanel } from "@/components/attorney/AskPanel";
 import { BriefGrid } from "@/components/attorney/BriefGrid";
 import { KeyMoments } from "@/components/attorney/KeyMoments";
@@ -34,7 +35,7 @@ export default function MatterPage({ params }: { params: Promise<{ id: string }>
             <BriefGrid matterId={matterId} />
           </TabsContent>
           <TabsContent value="deep"><KeyMoments matterId={matterId} showAll /></TabsContent>
-          <TabsContent value="cost">{/* Task 13: AiCostTab */}</TabsContent>
+          <TabsContent value="cost"><AiCostTab matterId={matterId} /></TabsContent>
         </Tabs>
       </main>
       <aside className="border-l"><AskPanel matterId={matterId} /></aside>
