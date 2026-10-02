@@ -25,6 +25,8 @@ const FIELDS: [ShareField, string][] = [
 ];
 const DEFAULT: Toggles = { fields: ["status", "open_requests"], document_ids: [], coverage_detail: "confirmed", status_note: "" };
 
+const toastError = (e: unknown) => toast.error(e instanceof ApiError ? e.message : String(e));
+
 export function ShareComposer({ matterId, initialProvider }: { matterId: number; initialProvider?: number }) {
   const providers = useApi<Providers>(`/api/matters/${matterId}/providers`);
   const grants = useApi<Grant[]>(`/api/matters/${matterId}/shares`);
@@ -42,11 +44,13 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
 
   useEffect(() => { if (!contactId && providers.data?.providers[0]) setContactId(providers.data.providers[0].contact_id); }, [providers.data, contactId]);
   useEffect(() => { setEmail(grant?.email ?? provider?.email ?? ""); }, [contactId, grant?.email, provider?.email]);
+  const last = audit.data?.versions.at(-1)?.policy;
+  const resetKey = `${contactId}|${audit.data?.grant.id}|${last?.version}`;   // stable ids: audit reloads (dismiss) keep unsaved edits
   useEffect(() => {   // start from the latest released policy, if any
-    const last = audit.data?.versions.at(-1)?.policy;
     setT(last ? { fields: last.fields, document_ids: last.document_ids, coverage_detail: last.coverage_detail, status_note: last.status_note ?? "" } : DEFAULT);
     setFlags([]);
-  }, [audit.data, contactId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   const preview = useMemo(() => (candidates.data ? applyPolicy(candidates.data, t) : null), [candidates.data, t]);
   const openFlags = flags.filter((f) => t.status_note.includes(f.text));   // a flag clears once its text is edited out
@@ -55,9 +59,11 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
 
   async function draft() {
     if (!contactId) return;
-    const d = await api<ProviderDraft>(`/api/matters/${matterId}/provider-draft`, { json: { provider_contact_id: contactId, fields: t.fields } });
-    setT((s) => ({ ...s, status_note: d.draft }));
-    setFlags(d.flags);
+    try {
+      const d = await api<ProviderDraft>(`/api/matters/${matterId}/provider-draft`, { json: { provider_contact_id: contactId, fields: t.fields } });
+      setT((s) => ({ ...s, status_note: d.draft }));
+      setFlags(d.flags);
+    } catch (e) { toastError(e); }
   }
 
   async function release() {
@@ -72,20 +78,24 @@ export function ShareComposer({ matterId, initialProvider }: { matterId: number;
       if (r.invite_url) toast(`Invite link (also in server console): ${r.invite_url}`, { duration: 20000 });
       grants.reload(); audit.reload();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : String(e));
+      toastError(e);
     } finally { setBusy(false); }
   }
 
   async function revoke() {
     if (!grant || !confirm(`Revoke ${grant.provider_name ?? "this provider"}'s access? They lose access immediately.`)) return;
-    await api(`/api/shares/${grant.id}/revoke`, { method: "POST" });
-    toast.success("Access revoked");
-    grants.reload();
+    try {
+      await api(`/api/shares/${grant.id}/revoke`, { method: "POST" });
+      toast.success("Access revoked");
+      grants.reload();
+    } catch (e) { toastError(e); }
   }
 
   async function dismiss(id: string) {
-    await api(`/api/requests/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
-    reqs.reload(); candidates.reload(); audit.reload();
+    try {
+      await api(`/api/requests/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
+      reqs.reload(); candidates.reload(); audit.reload();
+    } catch (e) { toastError(e); }
   }
 
   return (
