@@ -1,0 +1,15 @@
+# Case-worth heuristic (F4). GENERIC personal-injury rule of thumb, not tuned to any case.
+# worth range = medical specials × multiplier band for the most severe injury tier found in the file,
+# plus other special damages (e.g. documented lost wages) added 1:1.
+# Labeled "Estimate" in the UI; every input is a cited assumption. The LLM never produces the number.
+version: 1
+method: >-
+  Medical specials (sum of medical bills in the file) × a multiplier band chosen by the most severe injury tier
+  documented in the records, plus other special damages. When liability limits are found, the note shows that
+  practical recovery may be capped by available coverage.
+tiers:
+  soft_tissue:   {low: 1.5, high: 3.0, label: "Soft-tissue injury"}
+  objective:     {low: 2.0, high: 4.0, label: "Objective injury (imaging-confirmed)"}
+  surgical:      {low: 3.0, high: 5.0, label: "Surgical injury (surgery performed or recommended)"}
+default_tier_when_unknown: soft_tissue
+round_to: 1000

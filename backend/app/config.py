@@ -24,7 +24,7 @@ class Settings:
     clio_client_secret: str = _get("CLIO_CLIENT_SECRET")
     clio_redirect_uri: str = _get("CLIO_REDIRECT_URI", "http://localhost:8000/auth/clio/callback")
     clio_base_url: str = _get("CLIO_BASE_URL", "https://app.clio.com").rstrip("/")
-    jwt_secret: str = _get("JWT_SECRET", "dev-insecure-secret-change-me")
+    jwt_secret: str = _get("JWT_SECRET", "dev-insecure-secret-change-me-before-any-demo")
     attorney_email: str = _get("ATTORNEY_EMAIL", "attorney@firm.test")
     attorney_password: str = _get("ATTORNEY_PASSWORD", "")
     attorney_name: str = _get("ATTORNEY_NAME", "Firm Attorney")
