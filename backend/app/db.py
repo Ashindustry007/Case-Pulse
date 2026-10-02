@@ -15,7 +15,7 @@ from typing import Any, Iterator
 
 import sqlite_vec
 
-from .config import settings
+from . import config
 
 SCHEMA = Path(__file__).resolve().parents[1] / "db" / "schema.sql"
 EMBED_DIM = 768
@@ -36,7 +36,7 @@ def now_iso() -> str:
 
 
 def _open(path: Path | str | None = None) -> sqlite3.Connection:
-    p = Path(path or settings.db_path)
+    p = Path(path or config.settings.db_path)
     p.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(p, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -86,4 +86,4 @@ def jdump(value: Any) -> str:
 
 if __name__ == "__main__":
     migrate()
-    print(f"schema applied → {settings.db_path}")
+    print(f"schema applied → {config.settings.db_path}")
