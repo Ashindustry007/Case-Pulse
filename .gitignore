@@ -220,7 +220,12 @@ __marimo__/
 # --- Case Pulse ---
 # The Python template above ignores lib/ — re-include the frontend's lib/
 !frontend/lib/
-data/
+# data/: the digested demo case is committed (documents, page images, sanitized DB). The live DB holds Clio
+# tokens and password hashes, so it stays ignored. Refresh the sanitized copy with `make export-demo`.
+data/*
+!data/files/
+!data/pages/
+!data/casepulse.demo.db
 node_modules/
 .next/
 frontend/next-env.d.ts

@@ -44,7 +44,27 @@ Every call is logged to `ai_runs` (tokens, $, cache hits, savings) and shown to 
 **Ask-the-case eval** ([`eval/results.md`](eval/results.md)): 10 generic attorney questions → **147/147 citations
 (100%) resolve to the exact source text** at their stored offsets; out-of-file questions are answered "not in the file".
 
-## Quickstart
+## Run it from a fresh clone (no Clio account needed)
+The repo bundles the already-digested Sapini case: source documents and page images in `data/files/` and
+`data/pages/`, and the database (records, embeddings, AI digests, brief) in `data/casepulse.demo.db`.
+Logins and Clio tokens are **not** in the repo.
+
+Prerequisites: Python 3.12 + [uv](https://docs.astral.sh/uv/), Node 20+ (22 recommended), `make`.
+
+```bash
+git clone https://github.com/Ashindustry007/SWANS-2026-Hackathon.git && cd SWANS-2026-Hackathon
+cp .env.example .env     # set JWT_SECRET, ATTORNEY_EMAIL, ATTORNEY_PASSWORD; add ANTHROPIC_API_KEY for "Ask the case"
+make demo                # installs deps, installs the bundled DB as data/casepulse.db, creates the attorney login
+make backend             # terminal 1 — API on :8000
+make frontend            # terminal 2 — UI on :3000  →  sign in at http://localhost:3000/login
+```
+- Everything except **Ask the case** reads from the database and needs no API key; Ask needs `ANTHROPIC_API_KEY`.
+- The first Ask downloads the local embedding model (`BAAI/bge-base-en-v1.5`, ~130 MB), so it needs internet once.
+- Providers: send a share invite from a matter's **Share** page; the provider sets a password from the invite link.
+- Refreshing the bundled data after re-syncing from Clio: `make export-demo` (strips tokens/logins), then commit
+  `data/casepulse.demo.db`. To use your own Clio account instead, follow the Quickstart below.
+
+## Quickstart (own Clio account)
 ```bash
 cp .env.example .env            # ANTHROPIC_API_KEY, CLIO_CLIENT_ID/SECRET (redirect http://127.0.0.1:8000/auth/clio/callback)
 make setup migrate seed-attorney

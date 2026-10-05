@@ -1,11 +1,22 @@
 # Case Pulse — common commands. Backend: uv + Python 3.12. Frontend: Next.js (frontend/).
-.PHONY: clio-connect clio-code setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test
+.PHONY: demo demo-data export-demo clio-connect clio-code setup migrate seed-attorney backend frontend sync digest cache-demo smoke types test
 
 PY := uv run python
 
 setup:            ## install backend deps (and frontend deps if present)
 	uv sync
 	@if [ -f frontend/package.json ]; then cd frontend && npm install; fi
+
+demo:             ## fresh clone → ready to run on the bundled Sapini case (no Clio account needed)
+	$(MAKE) setup demo-data migrate seed-attorney
+	@echo "Now run 'make backend' and 'make frontend' in two terminals, then open http://localhost:3000"
+
+demo-data:        ## install the bundled, already-digested case as data/casepulse.db (never overwrites an existing one)
+	@if [ -f data/casepulse.db ]; then echo "data/casepulse.db already exists - leaving it alone"; \
+	else cp data/casepulse.demo.db data/casepulse.db && echo "installed data/casepulse.db from data/casepulse.demo.db"; fi
+
+export-demo:      ## refresh data/casepulse.demo.db from your live DB, with tokens/logins stripped (then commit it)
+	$(PY) -m scripts.export_demo_db
 
 migrate:          ## create/upgrade the SQLite schema (data/casepulse.db)
 	$(PY) -m backend.app.db
