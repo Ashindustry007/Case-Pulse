@@ -1,5 +1,8 @@
 # Case Pulse — SWANS 2026 Hackathon (Law-Di-Gras)
 
+<img width="917.5" height="342.5" alt="Screenshot 2026-10-02 at 4 05 43 PM" src="https://github.com/user-attachments/assets/a5ce600e-a542-40ed-a492-3d591ac10ac6" />
+
+
 Cited case digestion for personal-injury firms and the medical providers treating their clients on lien.
 Reads Clio Manage **read-only**; every date, dollar figure, injury and claim on screen links to the exact note, email
 or document page span it came from.
